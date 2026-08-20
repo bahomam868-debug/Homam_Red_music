@@ -32,6 +32,7 @@ const { SoundCloudPlugin } = require('@distube/soundcloud');
 const { YouTubePlugin } = require('@distube/youtube');
 const { YtDlpPlugin } = require('@distube/yt-dlp');
 
+
 // ======================================================
 // CLIENT
 // ======================================================
@@ -49,11 +50,6 @@ const client = new Client({
 // ======================================================
 // DISTUBE
 // ======================================================
-
-const { DisTube } = require('distube');
-const { SoundCloudPlugin } = require('@distube/soundcloud');
-const { YouTubePlugin } = require('@distube/youtube');
-const { YtDlpPlugin } = require('@distube/yt-dlp');
 
 const distube = new DisTube(client, {
     plugins: [
