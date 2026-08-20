@@ -56,22 +56,6 @@ const distube = new DisTube(client, {
         new SoundCloudPlugin()
     ],
 
-    // مهم جداً حتى لا يخرج البوت عند انتهاء الأغنية
-    
-    // لا يخرج تلقائياً بسبب فراغ الروم
-    // سنعالج هذا بأنفسنا حسب وضع 24/7
-    leaveOnEmpty: false,
-
-    // لا يخرج بسبب stop
-    leaveOnStop: false,
-
-    emitNewSongOnly: false,
-
-    // البحث عن النتائج
-    searchSongs: 5,
-
-    // يسمح بالبحث العادي
-    nsfw: false
 });
 
 console.log('🔴 RED MUSIC');
