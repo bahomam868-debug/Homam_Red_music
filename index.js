@@ -75,6 +75,53 @@ const savedPlaylists = new Map();
 const musicChannels = new Map();
 const manualLeave = new Set();
 
+// ======================================================
+// PACKAGE VERSIONS
+// ======================================================
+
+try {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📦 PACKAGE VERSIONS');
+    console.log(
+        'DisTube:',
+        require('distube/package.json').version
+    );
+    console.log(
+        '@distube/youtube:',
+        require('@distube/youtube/package.json').version
+    );
+    console.log(
+        '@distube/yt-dlp:',
+        require('@distube/yt-dlp/package.json').version
+    );
+
+    try {
+        console.log(
+            '@distube/ytdl-core:',
+            require('@distube/ytdl-core/package.json').version
+        );
+    } catch {
+        console.log('@distube/ytdl-core: NOT INSTALLED');
+    }
+
+    try {
+        console.log(
+            '@distube/ytsr:',
+            require('@distube/ytsr/package.json').version
+        );
+    } catch {
+        console.log('@distube/ytsr: NOT INSTALLED');
+    }
+
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+} catch (error) {
+
+    console.error(
+        '❌ PACKAGE VERSION CHECK ERROR:',
+        error.message
+    );
+}
 
 // ======================================================
 // HELPERS
