@@ -50,11 +50,16 @@ const client = new Client({
 // DISTUBE
 // ======================================================
 
+const { DisTube } = require('distube');
+const { SoundCloudPlugin } = require('@distube/soundcloud');
+const { YouTubePlugin } = require('@distube/youtube');
+const { YtDlpPlugin } = require('@distube/yt-dlp');
+
 const distube = new DisTube(client, {
     plugins: [
-        new YtDlpPlugin({ update: true }),
         new YouTubePlugin(),
-        new SoundCloudPlugin()
+        new SoundCloudPlugin(),
+        new YtDlpPlugin({ update: true })
     ]
 });
 
@@ -62,6 +67,7 @@ console.log('🔴 RED MUSIC');
 console.log('✅ DisTube loaded successfully');
 console.log('✅ YouTube Plugin loaded successfully');
 console.log('✅ SoundCloud Plugin loaded successfully');
+console.log('✅ YtDlp Plugin loaded successfully');
 
 
 // ======================================================
