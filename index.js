@@ -3,6 +3,7 @@
 // ======================================================
 // 🔴 RED MUSIC
 // Discord.js 14 + DisTube 5
+// Render Web Service
 // ======================================================
 
 const express = require('express');
@@ -29,6 +30,7 @@ const { YtDlpPlugin } = require('@distube/yt-dlp');
 
 const TOKEN = process.env.TOKEN;
 const PORT = Number(process.env.PORT) || 3000;
+
 const PREFIX = '5';
 
 const EMPTY_LEAVE_DELAY = 5 * 60 * 1000;
@@ -63,7 +65,7 @@ const client = new Client({
 const app = express();
 
 app.get('/', (req, res) => {
-    res.status(200).send('RED MUSIC Bot is online!');
+    res.status(200).send('🔴 RED MUSIC Bot is online!');
 });
 
 app.get('/health', (req, res) => {
@@ -97,16 +99,10 @@ const distube = new DisTube(client, {
 
 const musicChannels = new Map();
 const musicPanels = new Map();
-
 const mode247 = new Map();
 const manualLeave = new Set();
-
 const emptyTimers = new Map();
 const savedPlaylists = new Map();
-
-// مهم:
-// نحفظ الروم الصوتي بشكل مستقل عن روم الكتابة
-const savedVoiceChannels = new Map();
 
 // ======================================================
 // START LOG
@@ -205,33 +201,22 @@ function setMusicChannel(guildId, channel) {
     }
 }
 
-function getSavedVoiceChannel(guildId) {
-    return savedVoiceChannels.get(guildId);
-}
-
-function setSavedVoiceChannel(guildId, channel) {
-    if (!guildId || !channel) return;
-
-    savedVoiceChannels.set(
-        guildId,
-        {
-            id: channel.id,
-            guildId: channel.guild.id
-        }
-    );
-}
-
 function getBotVoiceChannel(guild) {
     return guild?.members?.me?.voice?.channel || null;
 }
 
 function isInVoice(member) {
-    return Boolean(member?.voice?.channel);
+    return Boolean(
+        member?.voice?.channel
+    );
 }
 
 function sameVoiceAsBot(member, guild) {
-    const userChannel = member?.voice?.channel;
-    const botChannel = getBotVoiceChannel(guild);
+    const userChannel =
+        member?.voice?.channel;
+
+    const botChannel =
+        getBotVoiceChannel(guild);
 
     if (!userChannel) {
         return false;
@@ -253,9 +238,12 @@ function hasHumanMembers(channel) {
 }
 
 function clearEmptyTimer(guildId) {
-    const timer = emptyTimers.get(guildId);
+    const timer =
+        emptyTimers.get(guildId);
 
-    if (!timer) return;
+    if (!timer) {
+        return;
+    }
 
     clearTimeout(timer);
 
@@ -282,8 +270,8 @@ function getAddedSongEmbed(song) {
     return redEmbed()
         .setDescription(
             `➕ **تمت إضافة الأغنية إلى التشغيل**\n\n` +
-            `🎵 **${song?.name || 'Unknown Song'}**\n` +
-            `⏱️ \`${song?.formattedDuration || formatTime(song?.duration)}\``
+            `🎵 **${song.name}**\n` +
+            `⏱️ \`${song.formattedDuration || formatTime(song.duration)}\``
         )
         .setFooter({
             text: 'RED MUSIC • Music System'
@@ -291,7 +279,8 @@ function getAddedSongEmbed(song) {
 }
 
 function getPingEmbed() {
-    const ping = client.ws.ping;
+    const ping =
+        client.ws.ping;
 
     return redEmbed()
         .setTitle('🏓 PONG!')
@@ -403,86 +392,117 @@ function getMusicPanel(song, queue) {
         });
 
     const row1 =
-        new ActionRowBuilder().addComponents(
+        new ActionRowBuilder()
+            .addComponents(
 
-            new ButtonBuilder()
-                .setCustomId('btn_prev')
-                .setEmoji('⏮️')
-                .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('btn_prev')
+                    .setEmoji('⏮️')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_back10')
-                .setEmoji('⏪')
-                .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('btn_back10')
+                    .setEmoji('⏪')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_pause')
-                .setEmoji('⏸️')
-                .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('btn_pause')
+                    .setEmoji('⏸️')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_resume')
-                .setEmoji('▶️')
-                .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId('btn_resume')
+                    .setEmoji('▶️')
+                    .setStyle(
+                        ButtonStyle.Success
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_forward10')
-                .setEmoji('⏩')
-                .setStyle(ButtonStyle.Secondary)
-        );
+                new ButtonBuilder()
+                    .setCustomId('btn_forward10')
+                    .setEmoji('⏩')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    )
+            );
 
     const row2 =
-        new ActionRowBuilder().addComponents(
+        new ActionRowBuilder()
+            .addComponents(
 
-            new ButtonBuilder()
-                .setCustomId('btn_skip')
-                .setEmoji('⏭️')
-                .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('btn_skip')
+                    .setEmoji('⏭️')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_loop')
-                .setEmoji('🔁')
-                .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('btn_loop')
+                    .setEmoji('🔁')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_shuffle')
-                .setEmoji('🔀')
-                .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('btn_shuffle')
+                    .setEmoji('🔀')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_queue')
-                .setEmoji('📋')
-                .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('btn_queue')
+                    .setEmoji('📋')
+                    .setStyle(
+                        ButtonStyle.Primary
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_stop')
-                .setEmoji('⏹️')
-                .setStyle(ButtonStyle.Danger)
-        );
+                new ButtonBuilder()
+                    .setCustomId('btn_stop')
+                    .setEmoji('⏹️')
+                    .setStyle(
+                        ButtonStyle.Danger
+                    )
+            );
 
     const row3 =
-        new ActionRowBuilder().addComponents(
+        new ActionRowBuilder()
+            .addComponents(
 
-            new ButtonBuilder()
-                .setCustomId('btn_voldown')
-                .setEmoji('🔉')
-                .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('btn_voldown')
+                    .setEmoji('🔉')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_volup')
-                .setEmoji('🔊')
-                .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('btn_volup')
+                    .setEmoji('🔊')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_back30')
-                .setLabel('-30s')
-                .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('btn_back30')
+                    .setLabel('-30s')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    ),
 
-            new ButtonBuilder()
-                .setCustomId('btn_forward30')
-                .setLabel('+30s')
-                .setStyle(ButtonStyle.Secondary)
-        );
+                new ButtonBuilder()
+                    .setCustomId('btn_forward30')
+                    .setLabel('+30s')
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    )
+            );
 
     return {
         embeds: [embed],
@@ -509,7 +529,8 @@ async function sendJoinMessage(channel) {
                     `🎧 **تم دخول البوت إلى الروم الصوتي**`
                 )
                 .setFooter({
-                    text: 'RED MUSIC • Music System'
+                    text:
+                        'RED MUSIC • Music System'
                 })
         ]
     }).catch(() => {});
@@ -529,7 +550,8 @@ async function sendLeaveMessage(guildId) {
                     `👋 **تم إخراج البوت من الروم الصوتي**`
                 )
                 .setFooter({
-                    text: 'RED MUSIC • Music System'
+                    text:
+                        'RED MUSIC • Music System'
                 })
         ]
     }).catch(() => {});
@@ -549,7 +571,8 @@ async function sendStopMessage(guildId) {
                     `▶️ يمكنك تشغيل أغنية جديدة باستخدام **/play** أو **5p**.`
                 )
                 .setFooter({
-                    text: 'RED MUSIC • Music System'
+                    text:
+                        'RED MUSIC • Music System'
                 })
         ]
     }).catch(() => {});
@@ -638,7 +661,9 @@ async function updateMusicPanel(guildId) {
     const panel =
         musicPanels.get(guildId);
 
-    if (!panel?.message) return;
+    if (!panel?.message) {
+        return;
+    }
 
     const queue =
         distube.getQueue(guildId);
@@ -654,16 +679,17 @@ async function updateMusicPanel(guildId) {
                 queue
             )
         );
-
     } catch (error) {
         if (error?.code === 10008) {
-            musicPanels.delete(guildId);
+            musicPanels.delete(
+                guildId
+            );
         }
     }
 }
 
 // ======================================================
-// VOICE LEAVE
+// LEAVE VOICE
 // ======================================================
 
 async function leaveGuildVoice(
@@ -681,7 +707,9 @@ async function leaveGuildVoice(
 
     try {
         const queue =
-            distube.getQueue(guildId);
+            distube.getQueue(
+                guildId
+            );
 
         if (queue) {
             await queue.stop()
@@ -716,27 +744,26 @@ function startEmptyTimer(guild) {
     const guildId =
         guild.id;
 
-    if (
-        mode247.get(guildId) === true
-    ) {
+    if (mode247.get(guildId)) {
         return;
     }
 
     const channel =
         getBotVoiceChannel(guild);
 
-    if (!channel) return;
-
-    if (
-        hasHumanMembers(channel)
-    ) {
-        clearEmptyTimer(guildId);
+    if (!channel) {
         return;
     }
 
-    if (
-        emptyTimers.has(guildId)
-    ) {
+    if (hasHumanMembers(channel)) {
+        clearEmptyTimer(
+            guildId
+        );
+
+        return;
+    }
+
+    if (emptyTimers.has(guildId)) {
         return;
     }
 
@@ -753,23 +780,19 @@ function startEmptyTimer(guild) {
                 );
 
                 const currentChannel =
-                    getBotVoiceChannel(guild);
+                    getBotVoiceChannel(
+                        guild
+                    );
 
                 if (!currentChannel) {
                     return;
                 }
 
-                if (
-                    mode247.get(guildId)
-                ) {
+                if (mode247.get(guildId)) {
                     return;
                 }
 
-                if (
-                    hasHumanMembers(
-                        currentChannel
-                    )
-                ) {
+                if (hasHumanMembers(currentChannel)) {
                     console.log(
                         `👤 USER RETURNED - BOT STAYS: ${guildId}`
                     );
@@ -826,12 +849,11 @@ async function playMusic({
         textChannel
     );
 
-    setSavedVoiceChannel(
-        guildId,
-        voiceChannel
+    clearEmptyTimer(
+        guildId
     );
 
-    clearEmptyTimer(
+    manualLeave.delete(
         guildId
     );
 
@@ -867,9 +889,7 @@ function createPlaylist(
     name
 ) {
     const lists =
-        getGuildPlaylists(
-            guildId
-        );
+        getGuildPlaylists(guildId);
 
     const clean =
         name?.trim();
@@ -908,9 +928,7 @@ function addToPlaylist(
     song
 ) {
     const lists =
-        getGuildPlaylists(
-            guildId
-        );
+        getGuildPlaylists(guildId);
 
     const playlist =
         lists.get(
@@ -954,18 +972,15 @@ async function playPlaylist({
         textChannel
     );
 
-    setSavedVoiceChannel(
-        guildId,
-        voiceChannel
-    );
-
     clearEmptyTimer(
         guildId
     );
 
-    for (
-        const song of playlist.songs
-    ) {
+    manualLeave.delete(
+        guildId
+    );
+
+    for (const song of playlist.songs) {
         await distube.play(
             voiceChannel,
             song,
@@ -1164,19 +1179,15 @@ client.once(
         console.log(
             '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
         );
-
         console.log(
             `✅ ${client.user.tag} ONLINE`
         );
-
         console.log(
             `🆔 ${client.user.id}`
         );
-
         console.log(
             '🎵 DisTube 5 READY'
         );
-
         console.log(
             '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
         );
@@ -1193,6 +1204,7 @@ client.once(
 
         try {
 
+            // حذف الأوامر العامة القديمة
             await rest.put(
                 Routes.applicationCommands(
                     client.user.id
@@ -1206,6 +1218,7 @@ client.once(
                 '🧹 OLD GLOBAL COMMANDS CLEARED'
             );
 
+            // تسجيل الأوامر داخل كل سيرفر
             for (
                 const guild
                 of client.guilds.cache.values()
@@ -1240,23 +1253,18 @@ client.once(
             console.log(
                 `✅ ${commands.length} SLASH COMMANDS READY`
             );
-
             console.log(
                 '⚡ Prefix: 5'
             );
-
             console.log(
                 '🎛️ Control Panel: READY'
             );
-
             console.log(
                 '⏱️ Empty Room Timeout: 5 MINUTES'
             );
-
             console.log(
                 '🔴 24/7: READY'
             );
-
             console.log(
                 '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
             );
@@ -1319,9 +1327,7 @@ distube.on(
 
         await channel.send({
             embeds: [
-                getAddedSongEmbed(
-                    song
-                )
+                getAddedSongEmbed(song)
             ]
         }).catch(() => {});
     }
@@ -1346,33 +1352,12 @@ distube.on(
             );
         }
 
-        const guild =
-            client.guilds.cache.get(
-                queue.id
-            );
-
-        const voiceChannel =
-            getBotVoiceChannel(
-                guild
-            );
-
-        if (voiceChannel) {
-            setSavedVoiceChannel(
-                queue.id,
-                voiceChannel
-            );
-        }
-
         await createMusicPanel(
             queue,
             song
         );
     }
 );
-
-// ======================================================
-// FINISH SONG
-// ======================================================
 
 distube.on(
     'finishSong',
@@ -1387,10 +1372,6 @@ distube.on(
         ).catch(() => {});
     }
 );
-
-// ======================================================
-// FINISH QUEUE
-// ======================================================
 
 distube.on(
     'finish',
@@ -1435,12 +1416,12 @@ distube.on(
                 return;
             }
 
-            const saved =
-                getSavedVoiceChannel(
+            const musicChannel =
+                getMusicChannel(
                     guildId
                 );
 
-            if (!saved) {
+            if (!musicChannel) {
                 console.log(
                     `⚠️ NO SAVED VOICE CHANNEL: ${guildId}`
                 );
@@ -1461,23 +1442,20 @@ distube.on(
                         }
 
                         if (
-                            getBotVoiceChannel(
-                                guild
-                            )
+                            getBotVoiceChannel(guild)
                         ) {
                             return;
                         }
 
                         const voiceChannel =
                             guild.channels.cache.get(
-                                saved.id
+                                musicChannel.id
                             );
 
                         if (
                             !voiceChannel ||
                             !voiceChannel.isVoiceBased()
                         ) {
-
                             console.log(
                                 `❌ SAVED VOICE CHANNEL NOT FOUND: ${guildId}`
                             );
@@ -1521,7 +1499,6 @@ distube.on(
             channel &&
             !hasHumanMembers(channel)
         ) {
-
             startEmptyTimer(
                 guild
             );
@@ -1554,7 +1531,6 @@ distube.on(
         if (
             manualLeave.has(guildId)
         ) {
-
             console.log(
                 `🚪 MANUAL LEAVE - NO RECONNECT: ${guildId}`
             );
@@ -1589,21 +1565,19 @@ distube.on(
                     }
 
                     if (
-                        getBotVoiceChannel(
-                            guild
-                        )
+                        getBotVoiceChannel(guild)
                     ) {
                         return;
                     }
 
-                    const saved =
-                        getSavedVoiceChannel(
+                    const musicChannel =
+                        getMusicChannel(
                             guildId
                         );
 
-                    if (!saved) {
+                    if (!musicChannel) {
                         console.log(
-                            `⚠️ NO SAVED MUSIC VOICE CHANNEL: ${guildId}`
+                            `⚠️ NO SAVED MUSIC CHANNEL: ${guildId}`
                         );
 
                         return;
@@ -1611,14 +1585,13 @@ distube.on(
 
                     const voiceChannel =
                         guild.channels.cache.get(
-                            saved.id
+                            musicChannel.id
                         );
 
                     if (
                         !voiceChannel ||
                         !voiceChannel.isVoiceBased()
                     ) {
-
                         console.log(
                             `❌ VOICE CHANNEL NOT FOUND: ${guildId}`
                         );
@@ -1695,7 +1668,9 @@ distube.on(
         const guildId =
             queue?.id;
 
-        if (!guildId) return;
+        if (!guildId) {
+            return;
+        }
 
         if (
             mode247.get(guildId) === true
@@ -1709,7 +1684,9 @@ distube.on(
             getMusicChannel(guildId) ||
             queue?.textChannel;
 
-        if (!channel) return;
+        if (!channel) {
+            return;
+        }
 
         if (
             queue?.songs?.length > 1
@@ -1807,10 +1784,7 @@ client.on(
             // COMMAND
             // ==================================================
 
-            if (
-                command === 'command'
-            ) {
-
+            if (command === 'command') {
                 return message.reply({
                     embeds: [
                         getCommandListEmbed()
@@ -1822,10 +1796,7 @@ client.on(
             // PING
             // ==================================================
 
-            if (
-                command === 'ping'
-            ) {
-
+            if (command === 'ping') {
                 return message.reply({
                     embeds: [
                         getPingEmbed()
@@ -1887,9 +1858,7 @@ client.on(
             // JOIN
             // ==================================================
 
-            if (
-                command === 'join'
-            ) {
+            if (command === 'join') {
 
                 if (!voiceChannel) {
                     return message.reply(
@@ -1903,11 +1872,6 @@ client.on(
                 setMusicChannel(
                     guildId,
                     message.channel
-                );
-
-                setSavedVoiceChannel(
-                    guildId,
-                    voiceChannel
                 );
 
                 clearEmptyTimer(
@@ -1952,9 +1916,7 @@ client.on(
             // LEAVE
             // ==================================================
 
-            if (
-                command === 'leave'
-            ) {
+            if (command === 'leave') {
 
                 const guildId =
                     message.guildId;
@@ -1988,10 +1950,11 @@ client.on(
                 }
 
                 setTimeout(
-                    () =>
+                    () => {
                         manualLeave.delete(
                             guildId
-                        ),
+                        );
+                    },
                     5000
                 );
 
@@ -2002,9 +1965,7 @@ client.on(
             // STOP
             // ==================================================
 
-            if (
-                command === 'stop'
-            ) {
+            if (command === 'stop') {
 
                 const queue =
                     distube.getQueue(
@@ -2043,9 +2004,7 @@ client.on(
             // SKIP
             // ==================================================
 
-            if (
-                command === 'skip'
-            ) {
+            if (command === 'skip') {
 
                 const queue =
                     distube.getQueue(
@@ -2138,9 +2097,7 @@ client.on(
             // 24/7
             // ==================================================
 
-            if (
-                command === '247'
-            ) {
+            if (command === '247') {
 
                 const guildId =
                     message.guildId;
@@ -2149,6 +2106,8 @@ client.on(
                     mode247.get(
                         guildId
                     ) === true;
+
+                // DISABLE
 
                 if (enabled) {
 
@@ -2166,7 +2125,6 @@ client.on(
                         channel &&
                         !hasHumanMembers(channel)
                     ) {
-
                         startEmptyTimer(
                             message.guild
                         );
@@ -2184,6 +2142,8 @@ client.on(
                     });
                 }
 
+                // ENABLE
+
                 if (!voiceChannel) {
                     return message.reply(
                         '❌ يجب أن تكون في روم صوتي حتى تفعل 24/7.'
@@ -2195,14 +2155,13 @@ client.on(
                     true
                 );
 
+                manualLeave.delete(
+                    guildId
+                );
+
                 setMusicChannel(
                     guildId,
                     message.channel
-                );
-
-                setSavedVoiceChannel(
-                    guildId,
-                    voiceChannel
                 );
 
                 clearEmptyTimer(
@@ -2248,9 +2207,7 @@ client.on(
             // SEEK
             // ==================================================
 
-            if (
-                command === 'seek'
-            ) {
+            if (command === 'seek') {
 
                 const seconds =
                     Number(args[0]);
@@ -2264,7 +2221,6 @@ client.on(
                     !Number.isFinite(seconds) ||
                     seconds < 0
                 ) {
-
                     return message.reply(
                         '❌ اكتب عدد ثواني صحيح.'
                     );
@@ -2304,12 +2260,10 @@ client.on(
             }
 
             // ==================================================
-            // PLAYLISTS
+            // PLAYLIST
             // ==================================================
 
-            if (
-                command === 'list'
-            ) {
+            if (command === 'list') {
 
                 const sub =
                     args.shift()?.toLowerCase();
@@ -2320,9 +2274,9 @@ client.on(
                     );
                 }
 
-                if (
-                    sub === 'create'
-                ) {
+                // CREATE
+
+                if (sub === 'create') {
 
                     const name =
                         args.join(' ').trim();
@@ -2353,9 +2307,9 @@ client.on(
                     }
                 }
 
-                if (
-                    sub === 'add'
-                ) {
+                // ADD
+
+                if (sub === 'add') {
 
                     const name =
                         args.shift();
@@ -2390,9 +2344,9 @@ client.on(
                     }
                 }
 
-                if (
-                    sub === 'show'
-                ) {
+                // SHOW
+
+                if (sub === 'show') {
 
                     const lists =
                         getGuildPlaylists(
@@ -2430,9 +2384,9 @@ client.on(
                     });
                 }
 
-                if (
-                    sub === 'play'
-                ) {
+                // PLAY
+
+                if (sub === 'play') {
 
                     if (!voiceChannel) {
                         return message.reply(
@@ -2536,14 +2490,9 @@ client.on(
                 const voiceChannel =
                     member?.voice?.channel;
 
-                // ==================================================
                 // COMMAND
-                // ==================================================
 
-                if (
-                    command === 'command'
-                ) {
-
+                if (command === 'command') {
                     return interaction.reply({
                         embeds: [
                             getCommandListEmbed()
@@ -2552,14 +2501,9 @@ client.on(
                     });
                 }
 
-                // ==================================================
                 // PING
-                // ==================================================
 
-                if (
-                    command === 'ping'
-                ) {
-
+                if (command === 'ping') {
                     return interaction.reply({
                         embeds: [
                             getPingEmbed()
@@ -2567,13 +2511,9 @@ client.on(
                     });
                 }
 
-                // ==================================================
                 // PLAY
-                // ==================================================
 
-                if (
-                    command === 'play'
-                ) {
+                if (command === 'play') {
 
                     if (!voiceChannel) {
                         return interaction.reply({
@@ -2584,9 +2524,8 @@ client.on(
                     }
 
                     const query =
-                        interaction.options.getString(
-                            'song'
-                        );
+                        interaction.options
+                            .getString('song');
 
                     await interaction.deferReply({
                         ephemeral: true
@@ -2621,9 +2560,7 @@ client.on(
                     }
                 }
 
-                // ==================================================
                 // PLAYLIST
-                // ==================================================
 
                 if (
                     command === 'playlist' ||
@@ -2635,10 +2572,7 @@ client.on(
                             guildId
                         );
 
-                    if (
-                        !queue?.songs?.length
-                    ) {
-
+                    if (!queue?.songs?.length) {
                         return interaction.reply({
                             content:
                                 '❌ القائمة فارغة حالياً.',
@@ -2678,29 +2612,25 @@ client.on(
                     });
                 }
 
-                // ==================================================
                 // LIST
-                // ==================================================
 
-                if (
-                    command === 'list'
-                ) {
+                if (command === 'list') {
 
                     const sub =
-                        interaction.options.getSubcommand();
+                        interaction.options
+                            .getSubcommand();
 
-                    if (
-                        sub === 'create'
-                    ) {
+                    // CREATE
+
+                    if (sub === 'create') {
 
                         try {
 
                             const playlist =
                                 createPlaylist(
                                     guildId,
-                                    interaction.options.getString(
-                                        'name'
-                                    )
+                                    interaction.options
+                                        .getString('name')
                                 );
 
                             return interaction.reply({
@@ -2719,21 +2649,20 @@ client.on(
                         }
                     }
 
-                    if (
-                        sub === 'add'
-                    ) {
+                    // ADD
+
+                    if (sub === 'add') {
 
                         try {
 
                             const playlist =
                                 addToPlaylist(
                                     guildId,
-                                    interaction.options.getString(
-                                        'name'
-                                    ),
-                                    interaction.options.getString(
-                                        'song'
-                                    )
+                                    interaction.options
+                                        .getString('name'),
+
+                                    interaction.options
+                                        .getString('song')
                                 );
 
                             return interaction.reply({
@@ -2752,9 +2681,9 @@ client.on(
                         }
                     }
 
-                    if (
-                        sub === 'show'
-                    ) {
+                    // SHOW
+
+                    if (sub === 'show') {
 
                         const lists =
                             getGuildPlaylists(
@@ -2795,9 +2724,9 @@ client.on(
                         });
                     }
 
-                    if (
-                        sub === 'play'
-                    ) {
+                    // PLAY
+
+                    if (sub === 'play') {
 
                         if (!voiceChannel) {
                             return interaction.reply({
@@ -2808,9 +2737,8 @@ client.on(
                         }
 
                         const name =
-                            interaction.options.getString(
-                                'name'
-                            );
+                            interaction.options
+                                .getString('name');
 
                         const playlist =
                             getGuildPlaylists(
@@ -2827,9 +2755,7 @@ client.on(
                             });
                         }
 
-                        if (
-                            !playlist.songs.length
-                        ) {
+                        if (!playlist.songs.length) {
                             return interaction.reply({
                                 content:
                                     '❌ القائمة فارغة.',
@@ -2872,13 +2798,9 @@ client.on(
                     }
                 }
 
-                // ==================================================
                 // JOIN
-                // ==================================================
 
-                if (
-                    command === 'join'
-                ) {
+                if (command === 'join') {
 
                     if (!voiceChannel) {
                         return interaction.reply({
@@ -2891,11 +2813,6 @@ client.on(
                     setMusicChannel(
                         guildId,
                         interaction.channel
-                    );
-
-                    setSavedVoiceChannel(
-                        guildId,
-                        voiceChannel
                     );
 
                     clearEmptyTimer(
@@ -2913,9 +2830,7 @@ client.on(
                             voiceChannel
                         );
 
-                        if (
-                            !alreadyInVoice
-                        ) {
+                        if (!alreadyInVoice) {
                             await sendJoinMessage(
                                 interaction.channel
                             );
@@ -2930,7 +2845,7 @@ client.on(
                     } catch (error) {
 
                         console.error(
-                            '❌ SLASH JOIN ERROR:',
+                            '❌ SLASH JOIN:',
                             error
                         );
 
@@ -2942,13 +2857,9 @@ client.on(
                     }
                 }
 
-                // ==================================================
                 // LEAVE
-                // ==================================================
 
-                if (
-                    command === 'leave'
-                ) {
+                if (command === 'leave') {
 
                     mode247.set(
                         guildId,
@@ -2973,33 +2884,30 @@ client.on(
                     } catch (error) {
 
                         console.error(
-                            '❌ SLASH LEAVE ERROR:',
+                            '❌ SLASH LEAVE:',
                             error
                         );
                     }
 
                     setTimeout(
-                        () =>
+                        () => {
                             manualLeave.delete(
                                 guildId
-                            ),
+                            );
+                        },
                         5000
                     );
 
                     return interaction.reply({
                         content:
-                            '👋 تم خروج البوت من الروم.',
+                            '👋 تم إخراج RED MUSIC من الروم.',
                         ephemeral: true
                     });
                 }
 
-                // ==================================================
                 // STOP
-                // ==================================================
 
-                if (
-                    command === 'stop'
-                ) {
+                if (command === 'stop') {
 
                     const queue =
                         distube.getQueue(
@@ -3033,13 +2941,9 @@ client.on(
                     });
                 }
 
-                // ==================================================
                 // SKIP
-                // ==================================================
 
-                if (
-                    command === 'skip'
-                ) {
+                if (command === 'skip') {
 
                     const queue =
                         distube.getQueue(
@@ -3074,9 +2978,7 @@ client.on(
                     }
                 }
 
-                // ==================================================
                 // PAUSE / RESUME
-                // ==================================================
 
                 if (
                     command === 'pause' ||
@@ -3137,18 +3039,15 @@ client.on(
                     }
                 }
 
-                // ==================================================
                 // SEEK
-                // ==================================================
 
-                if (
-                    command === 'seek'
-                ) {
+                if (command === 'seek') {
 
                     const seconds =
-                        interaction.options.getInteger(
-                            'seconds'
-                        );
+                        interaction.options
+                            .getInteger(
+                                'seconds'
+                            );
 
                     const queue =
                         distube.getQueue(
@@ -3189,13 +3088,9 @@ client.on(
                     }
                 }
 
-                // ==================================================
                 // 24/7
-                // ==================================================
 
-                if (
-                    command === '247'
-                ) {
+                if (command === '247') {
 
                     const enabled =
                         mode247.get(
@@ -3218,7 +3113,6 @@ client.on(
                             channel &&
                             !hasHumanMembers(channel)
                         ) {
-
                             startEmptyTimer(
                                 guild
                             );
@@ -3250,14 +3144,13 @@ client.on(
                         true
                     );
 
+                    manualLeave.delete(
+                        guildId
+                    );
+
                     setMusicChannel(
                         guildId,
                         interaction.channel
-                    );
-
-                    setSavedVoiceChannel(
-                        guildId,
-                        voiceChannel
                     );
 
                     clearEmptyTimer(
@@ -3302,9 +3195,7 @@ client.on(
             // BUTTONS
             // ==================================================
 
-            if (
-                interaction.isButton()
-            ) {
+            if (interaction.isButton()) {
 
                 const guild =
                     interaction.guild;
@@ -3333,7 +3224,6 @@ client.on(
                         guild
                     )
                 ) {
-
                     return interaction.reply({
                         content:
                             '❌ يجب أن تكون في نفس الروم الصوتي مع RED MUSIC.',
@@ -3354,13 +3244,9 @@ client.on(
                     });
                 }
 
-                // ==================================================
                 // PREVIOUS
-                // ==================================================
 
-                if (
-                    id === 'btn_prev'
-                ) {
+                if (id === 'btn_prev') {
 
                     try {
 
@@ -3384,9 +3270,7 @@ client.on(
                     return;
                 }
 
-                // ==================================================
                 // SEEK BUTTONS
-                // ==================================================
 
                 if (
                     id === 'btn_back10' ||
@@ -3436,13 +3320,9 @@ client.on(
                     return;
                 }
 
-                // ==================================================
                 // PAUSE
-                // ==================================================
 
-                if (
-                    id === 'btn_pause'
-                ) {
+                if (id === 'btn_pause') {
 
                     await interaction.deferUpdate();
 
@@ -3457,13 +3337,9 @@ client.on(
                     return;
                 }
 
-                // ==================================================
                 // RESUME
-                // ==================================================
 
-                if (
-                    id === 'btn_resume'
-                ) {
+                if (id === 'btn_resume') {
 
                     await interaction.deferUpdate();
 
@@ -3478,13 +3354,9 @@ client.on(
                     return;
                 }
 
-                // ==================================================
                 // SKIP
-                // ==================================================
 
-                if (
-                    id === 'btn_skip'
-                ) {
+                if (id === 'btn_skip') {
 
                     await interaction.deferUpdate();
 
@@ -3495,13 +3367,9 @@ client.on(
                     return;
                 }
 
-                // ==================================================
                 // LOOP
-                // ==================================================
 
-                if (
-                    id === 'btn_loop'
-                ) {
+                if (id === 'btn_loop') {
 
                     await interaction.deferUpdate();
 
@@ -3518,13 +3386,9 @@ client.on(
                     return;
                 }
 
-                // ==================================================
                 // SHUFFLE
-                // ==================================================
 
-                if (
-                    id === 'btn_shuffle'
-                ) {
+                if (id === 'btn_shuffle') {
 
                     await interaction.deferUpdate();
 
@@ -3541,13 +3405,9 @@ client.on(
                     return;
                 }
 
-                // ==================================================
                 // QUEUE
-                // ==================================================
 
-                if (
-                    id === 'btn_queue'
-                ) {
+                if (id === 'btn_queue') {
 
                     const list =
                         queue.songs
@@ -3582,13 +3442,9 @@ client.on(
                     });
                 }
 
-                // ==================================================
                 // STOP
-                // ==================================================
 
-                if (
-                    id === 'btn_stop'
-                ) {
+                if (id === 'btn_stop') {
 
                     await interaction.deferUpdate();
 
@@ -3607,9 +3463,7 @@ client.on(
                     return;
                 }
 
-                // ==================================================
                 // VOLUME
-                // ==================================================
 
                 if (
                     id === 'btn_voldown' ||
@@ -3700,7 +3554,9 @@ client.on(
                 newState.guild ||
                 oldState.guild;
 
-            if (!guild) return;
+            if (!guild) {
+                return;
+            }
 
             const guildId =
                 guild.id;
@@ -3728,7 +3584,7 @@ client.on(
                     );
 
                     if (
-                        mode247.get(guildId) === true &&
+                        mode247.get(guildId) &&
                         !manualLeave.has(guildId)
                     ) {
 
@@ -3743,17 +3599,12 @@ client.on(
                                     try {
 
                                         if (
-                                            mode247.get(guildId) === true &&
+                                            mode247.get(guildId) &&
                                             !manualLeave.has(guildId) &&
                                             !getBotVoiceChannel(guild)
                                         ) {
 
                                             await distube.voices.join(
-                                                oldChannel
-                                            );
-
-                                            setSavedVoiceChannel(
-                                                guildId,
                                                 oldChannel
                                             );
 
@@ -3793,9 +3644,8 @@ client.on(
                 return;
             }
 
-            // 24/7
             if (
-                mode247.get(guildId) === true
+                mode247.get(guildId)
             ) {
 
                 clearEmptyTimer(
@@ -3805,9 +3655,7 @@ client.on(
                 return;
             }
 
-            // ==================================================
             // USER JOINED BOT CHANNEL
-            // ==================================================
 
             if (
                 newState.channelId === botChannel.id &&
@@ -3822,9 +3670,7 @@ client.on(
                 return;
             }
 
-            // ==================================================
             // USER LEFT BOT CHANNEL
-            // ==================================================
 
             if (
                 oldState.channelId === botChannel.id &&
@@ -3852,9 +3698,7 @@ client.on(
                 return;
             }
 
-            // ==================================================
             // OTHER VOICE CHANGES
-            // ==================================================
 
             if (
                 oldState.channelId === botChannel.id ||
@@ -3941,9 +3785,7 @@ process.on(
 // LOGIN
 // ======================================================
 
-client.login(
-    TOKEN
-)
+client.login(TOKEN)
     .then(() => {
 
         console.log(
