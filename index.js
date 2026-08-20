@@ -29,7 +29,6 @@ const {
 
 const { DisTube } = require('distube');
 const { SoundCloudPlugin } = require('@distube/soundcloud');
-const { YouTubePlugin } = require('@distube/youtube');
 const { YtDlpPlugin } = require('@distube/yt-dlp');
 
 
@@ -53,18 +52,18 @@ const client = new Client({
 
 const distube = new DisTube(client, {
     plugins: [
-        new YouTubePlugin(),
         new SoundCloudPlugin(),
-        new YtDlpPlugin({ update: true })
+        new YtDlpPlugin({
+            update: true
+        })
     ]
 });
 
+
 console.log('🔴 RED MUSIC');
 console.log('✅ DisTube loaded successfully');
-console.log('✅ YouTube Plugin loaded successfully');
 console.log('✅ SoundCloud Plugin loaded successfully');
-console.log('✅ YtDlp Plugin loaded successfully');
-
+console.log('✅ YouTube Yt-Dlp Plugin loaded successfully');
 
 // ======================================================
 // DATA
@@ -1025,18 +1024,27 @@ distube.on(
                 `➕ ADD SONG: ${song.name}`
             );
 
+
             const channel =
                 getMusicChannel(guildId) ||
                 queue.textChannel;
 
+
             if (!channel) {
+
+                console.log(
+                    `❌ MUSIC CHANNEL NOT FOUND: ${guildId}`
+                );
+
                 return;
             }
+
 
             musicChannels.set(
                 guildId,
                 channel
             );
+
 
             await channel.send({
                 embeds: [
@@ -1044,16 +1052,18 @@ distube.on(
                 ]
             });
 
+
         } catch (error) {
 
             console.error(
                 '❌ ADD SONG ERROR:',
                 error
             );
+
         }
+
     }
 );
-
 
 // ======================================================
 // PLAY SONG
@@ -1065,8 +1075,7 @@ distube.on(
 
         try {
 
-            const guildId =
-                queue.id;
+            const guildId = queue.id;
 
             console.log(
                 `▶️ PLAY SONG: ${song.name}`
@@ -1084,16 +1093,18 @@ distube.on(
                 );
             }
 
-            createMusicPanel(
+
+            // إنشاء لوحة التحكم مباشرة عند بدء الأغنية
+            await createMusicPanel(
                 queue,
                 song
-            ).catch(error => {
+            );
 
-                console.error(
-                    '❌ PANEL CREATE ERROR:',
-                    error.message
-                );
-            });
+
+            console.log(
+                `🎛️ MUSIC PANEL READY: ${guildId}`
+            );
+
 
         } catch (error) {
 
@@ -1101,75 +1112,9 @@ distube.on(
                 '❌ PLAY SONG ERROR:',
                 error
             );
-        }
-    }
-);
 
-
-// ======================================================
-// FINISH
-// ======================================================
-
-distube.on(
-    'finish',
-    async queue => {
-
-        const guildId =
-            queue.id;
-
-        console.log(
-            `🏁 QUEUE FINISHED: ${guildId}`
-        );
-
-
-        // إذا 24/7 مفعّل:
-        // لا نخرج أبداً
-        if (
-            mode247.get(guildId)
-        ) {
-
-            console.log(
-                `🔴 24/7 ACTIVE - STAYING IN VOICE: ${guildId}`
-            );
-
-            return;
         }
 
-
-        // إذا 24/7 غير مفعّل:
-        // نخرج بعد انتهاء كل الأغاني
-        const guild =
-            client.guilds.cache.get(
-                guildId
-            );
-
-        if (guild) {
-
-            setTimeout(
-                async () => {
-
-                    // إذا بدأ المستخدم أغنية جديدة خلال الانتظار
-                    const currentQueue =
-                        distube.getQueue(guildId);
-
-                    if (currentQueue) {
-                        return;
-                    }
-
-                    if (
-                        mode247.get(guildId)
-                    ) {
-                        return;
-                    }
-
-                    await leaveGuildVoice(
-                        guild
-                    );
-
-                },
-                3000
-            );
-        }
     }
 );
 
@@ -1240,10 +1185,59 @@ distube.on(
 // ERROR
 // ======================================================
 
-distube.on('error', (error, queue) => {
-    console.error('❌ Distube Error:', error);
-});
+distube.on(
+    'error',
+    async (error, queue) => {
 
+        console.error(
+            '❌ DISTUBE ERROR:',
+            error
+        );
+
+
+        const guildId =
+            queue?.id;
+
+
+        if (!guildId) {
+            return;
+        }
+
+
+        const channel =
+            getMusicChannel(guildId) ||
+            queue?.textChannel;
+
+
+        if (!channel) {
+            return;
+        }
+
+
+        try {
+
+            await channel.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor('#FF0000')
+                        .setAuthor({
+                            name: '𝐑𝐄𝐃 𝐌𝐔𝐒𝐈𝐂'
+                        })
+                        .setDescription(
+                            `❌ **حدث خطأ أثناء تشغيل الأغنية**\n\n` +
+                            `🎵 RED MUSIC لم يستطع تشغيل المصدر.\n` +
+                            `🔄 جرّب رابطاً آخر أو أعد المحاولة.`
+                        )
+                        .setFooter({
+                            text: 'RED MUSIC • Music System'
+                        })
+                ]
+            });
+
+        } catch {}
+
+    }
+);
 
 
 // ======================================================
