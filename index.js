@@ -89,16 +89,8 @@ const client = new Client({
 // ======================================================
 
 const distube = new DisTube(client, {
-    searchSongs: 1,
-
-    leaveOnEmpty: false,
-    leaveOnFinish: false,
-    leaveOnStop: false,
-
     plugins: [
         new SoundCloudPlugin(),
-
-        // يجب أن يكون آخر Plugin
         new YtDlpPlugin({
             update: true
         })
