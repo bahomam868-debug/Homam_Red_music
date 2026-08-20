@@ -52,7 +52,6 @@ const client = new Client({
 
 const distube = new DisTube(client, {
     plugins: [
-        new YouTubePlugin(),
         new SoundCloudPlugin(),
         new YtDlpPlugin({
             update: true
@@ -63,9 +62,8 @@ const distube = new DisTube(client, {
 
 console.log('🔴 RED MUSIC');
 console.log('✅ DisTube loaded successfully');
-console.log('✅ YouTube Plugin loaded successfully');
 console.log('✅ SoundCloud Plugin loaded successfully');
-console.log('✅ YtDlp Plugin loaded successfully');
+console.log('✅ YouTube Yt-Dlp Plugin loaded successfully');
 
 // ======================================================
 // HELPERS
