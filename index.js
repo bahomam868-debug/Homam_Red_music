@@ -44,6 +44,19 @@ if (!TOKEN) {
 }
 
 // ======================================================
+// DISCORD CLIENT
+// ======================================================
+
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
+});
+
+// ======================================================
 // EXPRESS
 // ======================================================
 
@@ -56,26 +69,13 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
     res.status(200).json({
         status: 'online',
-        bot: client?.user?.tag || null,
+        bot: client.user?.tag || null,
         uptime: process.uptime()
     });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌍 Web server listening on port ${PORT}`);
-});
-
-// ======================================================
-// DISCORD CLIENT
-// ======================================================
-
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
 });
 
 // ======================================================
@@ -97,10 +97,16 @@ const distube = new DisTube(client, {
 
 const musicChannels = new Map();
 const musicPanels = new Map();
+
 const mode247 = new Map();
 const manualLeave = new Set();
+
 const emptyTimers = new Map();
 const savedPlaylists = new Map();
+
+// مهم:
+// نحفظ الروم الصوتي بشكل مستقل عن روم الكتابة
+const savedVoiceChannels = new Map();
 
 // ======================================================
 // START LOG
@@ -129,6 +135,7 @@ function formatTime(seconds) {
     }
 
     const total = Math.max(0, Math.floor(value));
+
     const hours = Math.floor(total / 3600);
     const minutes = Math.floor((total % 3600) / 60);
     const secs = total % 60;
@@ -142,6 +149,7 @@ function formatTime(seconds) {
 
 function createProgressBar(current, total) {
     const length = 20;
+
     const now = Number(current);
     const max = Number(total);
 
@@ -169,15 +177,19 @@ function getLoopText(queue) {
     switch (queue?.repeatMode) {
         case 1:
             return 'TRACK';
+
         case 2:
             return 'QUEUE';
+
         default:
             return 'OFF';
     }
 }
 
 function getSongRequester(song) {
-    return song?.user ? `${song.user}` : 'Unknown';
+    return song?.user
+        ? `${song.user}`
+        : 'Unknown';
 }
 
 function getMusicChannel(guildId) {
@@ -186,8 +198,27 @@ function getMusicChannel(guildId) {
 
 function setMusicChannel(guildId, channel) {
     if (guildId && channel) {
-        musicChannels.set(guildId, channel);
+        musicChannels.set(
+            guildId,
+            channel
+        );
     }
+}
+
+function getSavedVoiceChannel(guildId) {
+    return savedVoiceChannels.get(guildId);
+}
+
+function setSavedVoiceChannel(guildId, channel) {
+    if (!guildId || !channel) return;
+
+    savedVoiceChannels.set(
+        guildId,
+        {
+            id: channel.id,
+            guildId: channel.guild.id
+        }
+    );
 }
 
 function getBotVoiceChannel(guild) {
@@ -202,8 +233,13 @@ function sameVoiceAsBot(member, guild) {
     const userChannel = member?.voice?.channel;
     const botChannel = getBotVoiceChannel(guild);
 
-    if (!userChannel) return false;
-    if (!botChannel) return true;
+    if (!userChannel) {
+        return false;
+    }
+
+    if (!botChannel) {
+        return true;
+    }
 
     return userChannel.id === botChannel.id;
 }
@@ -222,9 +258,12 @@ function clearEmptyTimer(guildId) {
     if (!timer) return;
 
     clearTimeout(timer);
+
     emptyTimers.delete(guildId);
 
-    console.log(`⏱️ EMPTY TIMER CANCELLED: ${guildId}`);
+    console.log(
+        `⏱️ EMPTY TIMER CANCELLED: ${guildId}`
+    );
 }
 
 // ======================================================
@@ -243,8 +282,8 @@ function getAddedSongEmbed(song) {
     return redEmbed()
         .setDescription(
             `➕ **تمت إضافة الأغنية إلى التشغيل**\n\n` +
-            `🎵 **${song.name}**\n` +
-            `⏱️ \`${song.formattedDuration || formatTime(song.duration)}\``
+            `🎵 **${song?.name || 'Unknown Song'}**\n` +
+            `⏱️ \`${song?.formattedDuration || formatTime(song?.duration)}\``
         )
         .setFooter({
             text: 'RED MUSIC • Music System'
@@ -277,10 +316,10 @@ function getCommandListEmbed() {
             `**📋 PLAYLIST**\n` +
             `\`/playlist\` — عرض قائمة التشغيل\n` +
             `\`/lista\` — عرض قائمة التشغيل\n` +
-            `\`/list create <name>\` — إنشاء قائمة\n` +
-            `\`/list add <name> <song>\` — إضافة أغنية\n` +
-            `\`/list show\` — عرض القوائم\n` +
-            `\`/list play <name>\` — تشغيل قائمة\n\n` +
+            `\`5list create <name>\` — إنشاء قائمة\n` +
+            `\`5list add <name> <song>\` — إضافة أغنية\n` +
+            `\`5list show\` — عرض القوائم\n` +
+            `\`5list play <name>\` — تشغيل قائمة\n\n` +
 
             `**🎧 CONTROL**\n` +
             `\`/stop\` — إيقاف الموسيقى\n` +
@@ -312,15 +351,21 @@ function getCommandListEmbed() {
 // ======================================================
 
 function getMusicPanel(song, queue) {
-    const current = Number(queue?.currentTime) || 0;
-    const total = Number(song?.duration) || 0;
+    const current =
+        Number(queue?.currentTime) || 0;
 
-    const progress = createProgressBar(
-        current,
-        total
-    );
+    const total =
+        Number(song?.duration) || 0;
 
-    const currentTime = formatTime(current);
+    const progress =
+        createProgressBar(
+            current,
+            total
+        );
+
+    const currentTime =
+        formatTime(current);
+
     const totalTime =
         song?.formattedDuration ||
         formatTime(total);
@@ -357,85 +402,95 @@ function getMusicPanel(song, queue) {
             text: '𝐑𝐄𝐃 𝐌𝐔𝐒𝐈𝐂 • Music System'
         });
 
-    const row1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('btn_prev')
-            .setEmoji('⏮️')
-            .setStyle(ButtonStyle.Secondary),
+    const row1 =
+        new ActionRowBuilder().addComponents(
 
-        new ButtonBuilder()
-            .setCustomId('btn_back10')
-            .setEmoji('⏪')
-            .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_prev')
+                .setEmoji('⏮️')
+                .setStyle(ButtonStyle.Secondary),
 
-        new ButtonBuilder()
-            .setCustomId('btn_pause')
-            .setEmoji('⏸️')
-            .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_back10')
+                .setEmoji('⏪')
+                .setStyle(ButtonStyle.Secondary),
 
-        new ButtonBuilder()
-            .setCustomId('btn_resume')
-            .setEmoji('▶️')
-            .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId('btn_pause')
+                .setEmoji('⏸️')
+                .setStyle(ButtonStyle.Secondary),
 
-        new ButtonBuilder()
-            .setCustomId('btn_forward10')
-            .setEmoji('⏩')
-            .setStyle(ButtonStyle.Secondary)
-    );
+            new ButtonBuilder()
+                .setCustomId('btn_resume')
+                .setEmoji('▶️')
+                .setStyle(ButtonStyle.Success),
 
-    const row2 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('btn_skip')
-            .setEmoji('⏭️')
-            .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_forward10')
+                .setEmoji('⏩')
+                .setStyle(ButtonStyle.Secondary)
+        );
 
-        new ButtonBuilder()
-            .setCustomId('btn_loop')
-            .setEmoji('🔁')
-            .setStyle(ButtonStyle.Secondary),
+    const row2 =
+        new ActionRowBuilder().addComponents(
 
-        new ButtonBuilder()
-            .setCustomId('btn_shuffle')
-            .setEmoji('🔀')
-            .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_skip')
+                .setEmoji('⏭️')
+                .setStyle(ButtonStyle.Secondary),
 
-        new ButtonBuilder()
-            .setCustomId('btn_queue')
-            .setEmoji('📋')
-            .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('btn_loop')
+                .setEmoji('🔁')
+                .setStyle(ButtonStyle.Secondary),
 
-        new ButtonBuilder()
-            .setCustomId('btn_stop')
-            .setEmoji('⏹️')
-            .setStyle(ButtonStyle.Danger)
-    );
+            new ButtonBuilder()
+                .setCustomId('btn_shuffle')
+                .setEmoji('🔀')
+                .setStyle(ButtonStyle.Secondary),
 
-    const row3 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('btn_voldown')
-            .setEmoji('🔉')
-            .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_queue')
+                .setEmoji('📋')
+                .setStyle(ButtonStyle.Primary),
 
-        new ButtonBuilder()
-            .setCustomId('btn_volup')
-            .setEmoji('🔊')
-            .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_stop')
+                .setEmoji('⏹️')
+                .setStyle(ButtonStyle.Danger)
+        );
 
-        new ButtonBuilder()
-            .setCustomId('btn_back30')
-            .setLabel('-30s')
-            .setStyle(ButtonStyle.Secondary),
+    const row3 =
+        new ActionRowBuilder().addComponents(
 
-        new ButtonBuilder()
-            .setCustomId('btn_forward30')
-            .setLabel('+30s')
-            .setStyle(ButtonStyle.Secondary)
-    );
+            new ButtonBuilder()
+                .setCustomId('btn_voldown')
+                .setEmoji('🔉')
+                .setStyle(ButtonStyle.Secondary),
+
+            new ButtonBuilder()
+                .setCustomId('btn_volup')
+                .setEmoji('🔊')
+                .setStyle(ButtonStyle.Secondary),
+
+            new ButtonBuilder()
+                .setCustomId('btn_back30')
+                .setLabel('-30s')
+                .setStyle(ButtonStyle.Secondary),
+
+            new ButtonBuilder()
+                .setCustomId('btn_forward30')
+                .setLabel('+30s')
+                .setStyle(ButtonStyle.Secondary)
+        );
 
     return {
         embeds: [embed],
-        components: [row1, row2, row3]
+        components: [
+            row1,
+            row2,
+            row3
+        ]
     };
 }
 
@@ -461,7 +516,9 @@ async function sendJoinMessage(channel) {
 }
 
 async function sendLeaveMessage(guildId) {
-    const channel = getMusicChannel(guildId);
+    const channel =
+        getMusicChannel(guildId);
+
     if (!channel) return;
 
     await channel.send({
@@ -479,7 +536,9 @@ async function sendLeaveMessage(guildId) {
 }
 
 async function sendStopMessage(guildId) {
-    const channel = getMusicChannel(guildId);
+    const channel =
+        getMusicChannel(guildId);
+
     if (!channel) return;
 
     await channel.send({
@@ -497,11 +556,13 @@ async function sendStopMessage(guildId) {
 }
 
 // ======================================================
-// PANEL FUNCTIONS
+// PANEL
 // ======================================================
 
 async function deleteMusicPanel(guildId) {
-    const panel = musicPanels.get(guildId);
+    const panel =
+        musicPanels.get(guildId);
+
     if (!panel) return;
 
     try {
@@ -512,35 +573,57 @@ async function deleteMusicPanel(guildId) {
 }
 
 async function createMusicPanel(queue, song) {
-    if (!queue || !song) return null;
+    if (!queue || !song) {
+        return null;
+    }
 
-    const guildId = queue.id;
+    const guildId =
+        queue.id;
+
     const channel =
         getMusicChannel(guildId) ||
         queue.textChannel;
 
     if (!channel) {
-        console.log(`❌ PANEL CHANNEL NOT FOUND: ${guildId}`);
+        console.log(
+            `❌ PANEL CHANNEL NOT FOUND: ${guildId}`
+        );
+
         return null;
     }
 
-    setMusicChannel(guildId, channel);
+    setMusicChannel(
+        guildId,
+        channel
+    );
 
-    await deleteMusicPanel(guildId);
+    await deleteMusicPanel(
+        guildId
+    );
 
     try {
-        const message = await channel.send(
-            getMusicPanel(song, queue)
+        const message =
+            await channel.send(
+                getMusicPanel(
+                    song,
+                    queue
+                )
+            );
+
+        musicPanels.set(
+            guildId,
+            {
+                message,
+                channel
+            }
         );
 
-        musicPanels.set(guildId, {
-            message,
-            channel
-        });
-
-        console.log(`🎛️ PANEL CREATED: ${guildId}`);
+        console.log(
+            `🎛️ PANEL CREATED: ${guildId}`
+        );
 
         return message;
+
     } catch (error) {
         console.error(
             `❌ PANEL CREATE ERROR ${guildId}:`,
@@ -552,12 +635,17 @@ async function createMusicPanel(queue, song) {
 }
 
 async function updateMusicPanel(guildId) {
-    const panel = musicPanels.get(guildId);
+    const panel =
+        musicPanels.get(guildId);
+
     if (!panel?.message) return;
 
-    const queue = distube.getQueue(guildId);
+    const queue =
+        distube.getQueue(guildId);
 
-    if (!queue?.songs?.length) return;
+    if (!queue?.songs?.length) {
+        return;
+    }
 
     try {
         await panel.message.edit(
@@ -566,6 +654,7 @@ async function updateMusicPanel(guildId) {
                 queue
             )
         );
+
     } catch (error) {
         if (error?.code === 10008) {
             musicPanels.delete(guildId);
@@ -577,26 +666,43 @@ async function updateMusicPanel(guildId) {
 // VOICE LEAVE
 // ======================================================
 
-async function leaveGuildVoice(guild, sendMessage = false) {
+async function leaveGuildVoice(
+    guild,
+    sendMessage = false
+) {
     if (!guild) return;
 
-    const guildId = guild.id;
+    const guildId =
+        guild.id;
 
-    clearEmptyTimer(guildId);
+    clearEmptyTimer(
+        guildId
+    );
 
     try {
-        const queue = distube.getQueue(guildId);
-        if (queue) await queue.stop().catch(() => {});
+        const queue =
+            distube.getQueue(guildId);
+
+        if (queue) {
+            await queue.stop()
+                .catch(() => {});
+        }
     } catch {}
 
     try {
-        distube.voices.leave(guildId);
+        distube.voices.leave(
+            guildId
+        );
     } catch {}
 
-    await deleteMusicPanel(guildId);
+    await deleteMusicPanel(
+        guildId
+    );
 
     if (sendMessage) {
-        await sendLeaveMessage(guildId);
+        await sendLeaveMessage(
+            guildId
+        );
     }
 }
 
@@ -607,50 +713,87 @@ async function leaveGuildVoice(guild, sendMessage = false) {
 function startEmptyTimer(guild) {
     if (!guild) return;
 
-    const guildId = guild.id;
+    const guildId =
+        guild.id;
 
-    if (mode247.get(guildId)) return;
+    if (
+        mode247.get(guildId) === true
+    ) {
+        return;
+    }
 
-    const channel = getBotVoiceChannel(guild);
+    const channel =
+        getBotVoiceChannel(guild);
 
     if (!channel) return;
 
-    if (hasHumanMembers(channel)) {
+    if (
+        hasHumanMembers(channel)
+    ) {
         clearEmptyTimer(guildId);
         return;
     }
 
-    if (emptyTimers.has(guildId)) return;
+    if (
+        emptyTimers.has(guildId)
+    ) {
+        return;
+    }
 
     console.log(
         `⏱️ EMPTY ROOM: ${guildId} - leaving in 5 minutes`
     );
 
-    const timer = setTimeout(async () => {
-        emptyTimers.delete(guildId);
+    const timer =
+        setTimeout(
+            async () => {
 
-        const currentChannel =
-            getBotVoiceChannel(guild);
+                emptyTimers.delete(
+                    guildId
+                );
 
-        if (!currentChannel) return;
+                const currentChannel =
+                    getBotVoiceChannel(guild);
 
-        if (mode247.get(guildId)) return;
+                if (!currentChannel) {
+                    return;
+                }
 
-        if (hasHumanMembers(currentChannel)) {
-            console.log(
-                `👤 USER RETURNED - BOT STAYS: ${guildId}`
-            );
-            return;
-        }
+                if (
+                    mode247.get(guildId)
+                ) {
+                    return;
+                }
 
-        console.log(
-            `🚪 5 MINUTES FINISHED - LEAVING: ${guildId}`
+                if (
+                    hasHumanMembers(
+                        currentChannel
+                    )
+                ) {
+                    console.log(
+                        `👤 USER RETURNED - BOT STAYS: ${guildId}`
+                    );
+
+                    return;
+                }
+
+                console.log(
+                    `🚪 5 MINUTES FINISHED - LEAVING: ${guildId}`
+                );
+
+                await leaveGuildVoice(
+                    guild,
+                    true
+                );
+
+            },
+            EMPTY_LEAVE_DELAY
         );
 
-        await leaveGuildVoice(guild, true);
-    }, EMPTY_LEAVE_DELAY);
-
-    emptyTimers.set(guildId, timer);
+    emptyTimers.set(
+        guildId,
+        timer
+    );
 }
 
 // ======================================================
@@ -675,14 +818,22 @@ async function playMusic({
         );
     }
 
-    const guildId = voiceChannel.guild.id;
+    const guildId =
+        voiceChannel.guild.id;
 
     setMusicChannel(
         guildId,
         textChannel
     );
 
-    clearEmptyTimer(guildId);
+    setSavedVoiceChannel(
+        guildId,
+        voiceChannel
+    );
+
+    clearEmptyTimer(
+        guildId
+    );
 
     await distube.play(
         voiceChannel,
@@ -706,20 +857,36 @@ function getGuildPlaylists(guildId) {
         );
     }
 
-    return savedPlaylists.get(guildId);
+    return savedPlaylists.get(
+        guildId
+    );
 }
 
-function createPlaylist(guildId, name) {
-    const lists = getGuildPlaylists(guildId);
-    const clean = name?.trim();
-    const key = clean?.toLowerCase();
+function createPlaylist(
+    guildId,
+    name
+) {
+    const lists =
+        getGuildPlaylists(
+            guildId
+        );
+
+    const clean =
+        name?.trim();
+
+    const key =
+        clean?.toLowerCase();
 
     if (!key) {
-        throw new Error('اكتب اسم القائمة.');
+        throw new Error(
+            'اكتب اسم القائمة.'
+        );
     }
 
     if (lists.has(key)) {
-        throw new Error('هذه القائمة موجودة مسبقاً.');
+        throw new Error(
+            'هذه القائمة موجودة مسبقاً.'
+        );
     }
 
     const playlist = {
@@ -727,14 +894,28 @@ function createPlaylist(guildId, name) {
         songs: []
     };
 
-    lists.set(key, playlist);
+    lists.set(
+        key,
+        playlist
+    );
+
     return playlist;
 }
 
-function addToPlaylist(guildId, name, song) {
-    const lists = getGuildPlaylists(guildId);
+function addToPlaylist(
+    guildId,
+    name,
+    song
+) {
+    const lists =
+        getGuildPlaylists(
+            guildId
+        );
+
     const playlist =
-        lists.get(name?.trim().toLowerCase());
+        lists.get(
+            name?.trim().toLowerCase()
+        );
 
     if (!playlist) {
         throw new Error(
@@ -743,10 +924,15 @@ function addToPlaylist(guildId, name, song) {
     }
 
     if (!song?.trim()) {
-        throw new Error('اكتب اسم الأغنية.');
+        throw new Error(
+            'اكتب اسم الأغنية.'
+        );
     }
 
-    playlist.songs.push(song.trim());
+    playlist.songs.push(
+        song.trim()
+    );
+
     return playlist;
 }
 
@@ -758,7 +944,9 @@ async function playPlaylist({
     playlist
 }) {
     if (!playlist?.songs?.length) {
-        throw new Error('القائمة فارغة.');
+        throw new Error(
+            'القائمة فارغة.'
+        );
     }
 
     setMusicChannel(
@@ -766,9 +954,18 @@ async function playPlaylist({
         textChannel
     );
 
-    clearEmptyTimer(guildId);
+    setSavedVoiceChannel(
+        guildId,
+        voiceChannel
+    );
 
-    for (const song of playlist.songs) {
+    clearEmptyTimer(
+        guildId
+    );
+
+    for (
+        const song of playlist.songs
+    ) {
         await distube.play(
             voiceChannel,
             song,
@@ -788,484 +985,695 @@ function getCommands() {
     return [
         new SlashCommandBuilder()
             .setName('command')
-            .setDescription('عرض جميع أوامر RED MUSIC'),
+            .setDescription(
+                'عرض جميع أوامر RED MUSIC'
+            ),
 
         new SlashCommandBuilder()
             .setName('play')
-            .setDescription('تشغيل أغنية بالاسم أو الرابط')
+            .setDescription(
+                'تشغيل أغنية بالاسم أو الرابط'
+            )
             .addStringOption(option =>
                 option
                     .setName('song')
-                    .setDescription('اسم الأغنية أو الرابط')
+                    .setDescription(
+                        'اسم الأغنية أو الرابط'
+                    )
                     .setRequired(true)
             ),
 
         new SlashCommandBuilder()
             .setName('playlist')
-            .setDescription('عرض قائمة التشغيل الحالية'),
+            .setDescription(
+                'عرض قائمة التشغيل الحالية'
+            ),
 
         new SlashCommandBuilder()
             .setName('lista')
-            .setDescription('عرض قائمة التشغيل الحالية'),
+            .setDescription(
+                'عرض قائمة التشغيل الحالية'
+            ),
 
         new SlashCommandBuilder()
             .setName('list')
-            .setDescription('إدارة قوائم RED MUSIC')
+            .setDescription(
+                'إدارة قوائم RED MUSIC'
+            )
+
             .addSubcommand(sub =>
                 sub
                     .setName('create')
-                    .setDescription('إنشاء قائمة جديدة')
+                    .setDescription(
+                        'إنشاء قائمة جديدة'
+                    )
                     .addStringOption(option =>
                         option
                             .setName('name')
-                            .setDescription('اسم القائمة')
+                            .setDescription(
+                                'اسم القائمة'
+                            )
                             .setRequired(true)
                     )
             )
+
             .addSubcommand(sub =>
                 sub
                     .setName('add')
-                    .setDescription('إضافة أغنية إلى قائمة')
+                    .setDescription(
+                        'إضافة أغنية إلى قائمة'
+                    )
                     .addStringOption(option =>
                         option
                             .setName('name')
-                            .setDescription('اسم القائمة')
+                            .setDescription(
+                                'اسم القائمة'
+                            )
                             .setRequired(true)
                     )
                     .addStringOption(option =>
                         option
                             .setName('song')
-                            .setDescription('اسم الأغنية أو الرابط')
+                            .setDescription(
+                                'اسم الأغنية أو الرابط'
+                            )
                             .setRequired(true)
                     )
             )
+
             .addSubcommand(sub =>
                 sub
                     .setName('show')
-                    .setDescription('عرض القوائم المحفوظة')
+                    .setDescription(
+                        'عرض القوائم المحفوظة'
+                    )
             )
+
             .addSubcommand(sub =>
                 sub
                     .setName('play')
-                    .setDescription('تشغيل قائمة')
+                    .setDescription(
+                        'تشغيل قائمة'
+                    )
                     .addStringOption(option =>
                         option
                             .setName('name')
-                            .setDescription('اسم القائمة')
+                            .setDescription(
+                                'اسم القائمة'
+                            )
                             .setRequired(true)
                     )
             ),
 
         new SlashCommandBuilder()
             .setName('stop')
-            .setDescription('إيقاف الموسيقى'),
+            .setDescription(
+                'إيقاف الموسيقى'
+            ),
 
         new SlashCommandBuilder()
             .setName('skip')
-            .setDescription('تخطي الأغنية'),
+            .setDescription(
+                'تخطي الأغنية'
+            ),
 
         new SlashCommandBuilder()
             .setName('pause')
-            .setDescription('إيقاف مؤقت'),
+            .setDescription(
+                'إيقاف مؤقت'
+            ),
 
         new SlashCommandBuilder()
             .setName('resume')
-            .setDescription('استئناف الموسيقى'),
+            .setDescription(
+                'استئناف الموسيقى'
+            ),
 
         new SlashCommandBuilder()
             .setName('join')
-            .setDescription('دخول الروم الصوتي'),
+            .setDescription(
+                'دخول الروم الصوتي'
+            ),
 
         new SlashCommandBuilder()
             .setName('leave')
-            .setDescription('الخروج من الروم الصوتي'),
+            .setDescription(
+                'الخروج من الروم الصوتي'
+            ),
 
         new SlashCommandBuilder()
             .setName('247')
-            .setDescription('تفعيل أو إيقاف وضع 24/7'),
+            .setDescription(
+                'تفعيل أو إيقاف وضع 24/7'
+            ),
 
         new SlashCommandBuilder()
             .setName('seek')
-            .setDescription('الانتقال إلى وقت محدد')
+            .setDescription(
+                'الانتقال إلى وقت محدد'
+            )
             .addIntegerOption(option =>
                 option
                     .setName('seconds')
-                    .setDescription('عدد الثواني')
+                    .setDescription(
+                        'عدد الثواني'
+                    )
                     .setRequired(true)
                     .setMinValue(0)
             ),
 
         new SlashCommandBuilder()
             .setName('ping')
-            .setDescription('عرض سرعة استجابة البوت')
-    ].map(command => command.toJSON());
+            .setDescription(
+                'عرض سرعة استجابة البوت'
+            )
+    ].map(
+        command => command.toJSON()
+    );
 }
 
 // ======================================================
 // READY
 // ======================================================
 
-client.once('clientReady', async () => {
-    console.log('');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`✅ ${client.user.tag} ONLINE`);
-    console.log(`🆔 ${client.user.id}`);
-    console.log('🎵 DisTube 5 READY');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-    const rest = new REST({
-        version: '10'
-    }).setToken(TOKEN);
-
-    const commands = getCommands();
-
-    try {
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: [] }
-        );
-
-        console.log('🧹 OLD GLOBAL COMMANDS CLEARED');
-
-        for (const guild of client.guilds.cache.values()) {
-            try {
-                await rest.put(
-                    Routes.applicationGuildCommands(
-                        client.user.id,
-                        guild.id
-                    ),
-                    {
-                        body: commands
-                    }
-                );
-
-                console.log(
-                    `✅ COMMANDS REGISTERED: ${guild.name}`
-                );
-            } catch (error) {
-                console.error(
-                    `❌ COMMAND REGISTER ERROR ${guild.id}:`,
-                    error.message
-                );
-            }
-        }
+client.once(
+    'clientReady',
+    async () => {
 
         console.log('');
         console.log(
-            `✅ ${commands.length} SLASH COMMANDS READY`
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
         );
-        console.log('⚡ Prefix: 5');
-        console.log('🎛️ Control Panel: READY');
-        console.log('⏱️ Empty Room Timeout: 5 MINUTES');
-        console.log('🔴 24/7: READY');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    } catch (error) {
-        console.error(
-            '❌ COMMAND REGISTRATION ERROR:',
-            error 
-            });
-        // ======================================================
+        console.log(
+            `✅ ${client.user.tag} ONLINE`
+        );
+
+        console.log(
+            `🆔 ${client.user.id}`
+        );
+
+        console.log(
+            '🎵 DisTube 5 READY'
+        );
+
+        console.log(
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        );
+
+        const rest =
+            new REST({
+                version: '10'
+            }).setToken(
+                TOKEN
+            );
+
+        const commands =
+            getCommands();
+
+        try {
+
+            await rest.put(
+                Routes.applicationCommands(
+                    client.user.id
+                ),
+                {
+                    body: []
+                }
+            );
+
+            console.log(
+                '🧹 OLD GLOBAL COMMANDS CLEARED'
+            );
+
+            for (
+                const guild
+                of client.guilds.cache.values()
+            ) {
+
+                try {
+
+                    await rest.put(
+                        Routes.applicationGuildCommands(
+                            client.user.id,
+                            guild.id
+                        ),
+                        {
+                            body: commands
+                        }
+                    );
+
+                    console.log(
+                        `✅ COMMANDS REGISTERED: ${guild.name}`
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        `❌ COMMAND REGISTER ERROR ${guild.id}:`,
+                        error.message
+                    );
+                }
+            }
+
+            console.log('');
+            console.log(
+                `✅ ${commands.length} SLASH COMMANDS READY`
+            );
+
+            console.log(
+                '⚡ Prefix: 5'
+            );
+
+            console.log(
+                '🎛️ Control Panel: READY'
+            );
+
+            console.log(
+                '⏱️ Empty Room Timeout: 5 MINUTES'
+            );
+
+            console.log(
+                '🔴 24/7: READY'
+            );
+
+            console.log(
+                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+            );
+
+        } catch (error) {
+
+            console.error(
+                '❌ COMMAND REGISTRATION ERROR:',
+                error
+            );
+        }
+    }
+);
+
+// ======================================================
 // DISTUBE EVENTS
 // ======================================================
 
-distube.on('initQueue', queue => {
-    console.log(`✅ QUEUE CREATED: ${queue.id}`);
+distube.on(
+    'initQueue',
+    queue => {
 
-    if (queue.textChannel) {
-        setMusicChannel(
-            queue.id,
-            queue.textChannel
+        console.log(
+            `✅ QUEUE CREATED: ${queue.id}`
+        );
+
+        if (queue.textChannel) {
+            setMusicChannel(
+                queue.id,
+                queue.textChannel
+            );
+        }
+    }
+);
+
+distube.on(
+    'addSong',
+    async (queue, song) => {
+
+        console.log(
+            `➕ ADD SONG: ${song.name}`
+        );
+
+        if (queue.textChannel) {
+            setMusicChannel(
+                queue.id,
+                queue.textChannel
+            );
+        }
+
+        clearEmptyTimer(
+            queue.id
+        );
+
+        const channel =
+            getMusicChannel(queue.id) ||
+            queue.textChannel;
+
+        if (!channel) return;
+
+        await channel.send({
+            embeds: [
+                getAddedSongEmbed(
+                    song
+                )
+            ]
+        }).catch(() => {});
+    }
+);
+
+distube.on(
+    'playSong',
+    async (queue, song) => {
+
+        console.log(
+            `▶️ PLAY SONG: ${song.name}`
+        );
+
+        clearEmptyTimer(
+            queue.id
+        );
+
+        if (queue.textChannel) {
+            setMusicChannel(
+                queue.id,
+                queue.textChannel
+            );
+        }
+
+        const guild =
+            client.guilds.cache.get(
+                queue.id
+            );
+
+        const voiceChannel =
+            getBotVoiceChannel(
+                guild
+            );
+
+        if (voiceChannel) {
+            setSavedVoiceChannel(
+                queue.id,
+                voiceChannel
+            );
+        }
+
+        await createMusicPanel(
+            queue,
+            song
         );
     }
-});
-
-distube.on('addSong', async (queue, song) => {
-    console.log(`➕ ADD SONG: ${song.name}`);
-
-    if (queue.textChannel) {
-        setMusicChannel(
-            queue.id,
-            queue.textChannel
-        );
-    }
-
-    // 24/7 أو وجود موسيقى = لا يوجد مؤقت خروج
-    clearEmptyTimer(queue.id);
-
-    const channel =
-        getMusicChannel(queue.id) ||
-        queue.textChannel;
-
-    if (!channel) return;
-
-    await channel.send({
-        embeds: [
-            getAddedSongEmbed(song)
-        ]
-    }).catch(() => {});
-});
-
-distube.on('playSong', async (queue, song) => {
-    console.log(`▶️ PLAY SONG: ${song.name}`);
-
-    clearEmptyTimer(queue.id);
-
-    if (queue.textChannel) {
-        setMusicChannel(
-            queue.id,
-            queue.textChannel
-        );
-    }
-
-    await createMusicPanel(
-        queue,
-        song
-    );
-});
-
+);
 
 // ======================================================
 // FINISH SONG
 // ======================================================
 
-distube.on('finishSong', async queue => {
-    console.log(
-        `🏁 FINISH SONG: ${queue.id}`
-    );
+distube.on(
+    'finishSong',
+    async queue => {
 
-    await updateMusicPanel(
-        queue.id
-    ).catch(() => {});
-});
+        console.log(
+            `🏁 FINISH SONG: ${queue.id}`
+        );
 
+        await updateMusicPanel(
+            queue.id
+        ).catch(() => {});
+    }
+);
 
 // ======================================================
 // FINISH QUEUE
 // ======================================================
 
-distube.on('finish', async queue => {
-    const guildId = queue.id;
+distube.on(
+    'finish',
+    async queue => {
 
-    console.log(
-        `🏁 QUEUE FINISHED: ${guildId}`
-    );
+        const guildId =
+            queue.id;
 
-    const guild =
-        client.guilds.cache.get(guildId);
-
-    if (!guild) return;
-
-    // ==================================================
-    // 24/7
-    // ==================================================
-
-    if (mode247.get(guildId) === true) {
         console.log(
-            `🔴 24/7 ACTIVE - KEEPING BOT IN VOICE: ${guildId}`
+            `🏁 QUEUE FINISHED: ${guildId}`
         );
 
-        // ممنوع تشغيل مؤقت الخروج في 24/7
-        clearEmptyTimer(guildId);
-
-        // إذا البوت ما زال موجود بالروم، انتهينا
-        const currentChannel =
-            getBotVoiceChannel(guild);
-
-        if (currentChannel) {
-            return;
-        }
-
-        // إذا خرج لأي سبب، يرجع للروم المحفوظ
-        const musicChannel =
-            getMusicChannel(guildId);
-
-        if (!musicChannel) {
-            console.log(
-                `⚠️ NO SAVED VOICE CHANNEL: ${guildId}`
+        const guild =
+            client.guilds.cache.get(
+                guildId
             );
+
+        if (!guild) return;
+
+        // ==================================================
+        // 24/7
+        // ==================================================
+
+        if (
+            mode247.get(guildId) === true
+        ) {
+
+            console.log(
+                `🔴 24/7 ACTIVE - KEEPING BOT IN VOICE: ${guildId}`
+            );
+
+            clearEmptyTimer(
+                guildId
+            );
+
+            const currentChannel =
+                getBotVoiceChannel(
+                    guild
+                );
+
+            if (currentChannel) {
+                return;
+            }
+
+            const saved =
+                getSavedVoiceChannel(
+                    guildId
+                );
+
+            if (!saved) {
+                console.log(
+                    `⚠️ NO SAVED VOICE CHANNEL: ${guildId}`
+                );
+
+                return;
+            }
+
+            setTimeout(
+                async () => {
+
+                    try {
+
+                        if (
+                            mode247.get(guildId) !== true ||
+                            manualLeave.has(guildId)
+                        ) {
+                            return;
+                        }
+
+                        if (
+                            getBotVoiceChannel(
+                                guild
+                            )
+                        ) {
+                            return;
+                        }
+
+                        const voiceChannel =
+                            guild.channels.cache.get(
+                                saved.id
+                            );
+
+                        if (
+                            !voiceChannel ||
+                            !voiceChannel.isVoiceBased()
+                        ) {
+
+                            console.log(
+                                `❌ SAVED VOICE CHANNEL NOT FOUND: ${guildId}`
+                            );
+
+                            return;
+                        }
+
+                        await distube.voices.join(
+                            voiceChannel
+                        );
+
+                        console.log(
+                            `🔄 24/7 REJOIN SUCCESS: ${guildId}`
+                        );
+
+                    } catch (error) {
+
+                        console.error(
+                            `❌ 24/7 REJOIN ERROR ${guildId}:`,
+                            error?.message || error
+                        );
+                    }
+
+                },
+                3000
+            );
+
             return;
         }
 
-        setTimeout(async () => {
-            try {
-                // نتأكد أن 24/7 ما زال مفعلاً
-                if (
-                    mode247.get(guildId) !== true ||
-                    manualLeave.has(guildId)
-                ) {
-                    return;
-                }
+        // ==================================================
+        // NORMAL MODE
+        // ==================================================
 
-                // إذا رجع البوت بالفعل، لا نعمل شيء
-                if (getBotVoiceChannel(guild)) {
-                    return;
-                }
+        const channel =
+            getBotVoiceChannel(
+                guild
+            );
 
-                // نحاول الحصول على الروم الصوتي
-                const voiceChannel =
-                    guild.channels.cache.get(
-                        musicChannel.id
-                    );
+        if (
+            channel &&
+            !hasHumanMembers(channel)
+        ) {
 
-                if (
-                    !voiceChannel ||
-                    !voiceChannel.isVoiceBased()
-                ) {
-                    console.log(
-                        `❌ SAVED VOICE CHANNEL NOT FOUND: ${guildId}`
-                    );
-                    return;
-                }
-
-                await distube.voices.join(
-                    voiceChannel
-                );
-
-                console.log(
-                    `🔄 24/7 REJOIN SUCCESS: ${guildId}`
-                );
-
-            } catch (error) {
-                console.error(
-                    `❌ 24/7 REJOIN ERROR ${guildId}:`,
-                    error?.message || error
-                );
-            }
-        }, 3000);
-
-        return;
+            startEmptyTimer(
+                guild
+            );
+        }
     }
-
-    // ==================================================
-    // NORMAL MODE
-    // ==================================================
-
-    const channel =
-        getBotVoiceChannel(guild);
-
-    if (
-        channel &&
-        !hasHumanMembers(channel)
-    ) {
-        startEmptyTimer(guild);
-    }
-});
-
+);
 
 // ======================================================
 // DISTUBE DISCONNECT
 // ======================================================
 
-distube.on('disconnect', queue => {
-    const guildId = queue.id;
+distube.on(
+    'disconnect',
+    queue => {
 
-    const guild =
-        client.guilds.cache.get(guildId);
+        const guildId =
+            queue.id;
 
-    if (!guild) return;
-
-    console.log(
-        `⚠️ DISTUBE DISCONNECT: ${guildId}`
-    );
-
-    // خروج يدوي = لا تعيد الدخول
-    if (manualLeave.has(guildId)) {
-        console.log(
-            `🚪 MANUAL LEAVE - NO RECONNECT: ${guildId}`
-        );
-        return;
-    }
-
-    // 24/7 = إعادة دخول
-    if (mode247.get(guildId) !== true) {
-        return;
-    }
-
-    console.log(
-        `🔄 24/7 RECONNECTING: ${guildId}`
-    );
-
-    clearEmptyTimer(guildId);
-
-    setTimeout(async () => {
-        try {
-            // نتأكد أن 24/7 ما زال مفعلاً
-            if (
-                mode247.get(guildId) !== true ||
-                manualLeave.has(guildId)
-            ) {
-                return;
-            }
-
-            // إذا البوت موجود أصلاً
-            if (getBotVoiceChannel(guild)) {
-                return;
-            }
-
-            const musicChannel =
-                getMusicChannel(guildId);
-
-            if (!musicChannel) {
-                console.log(
-                    `⚠️ NO SAVED MUSIC CHANNEL: ${guildId}`
-                );
-                return;
-            }
-
-            const voiceChannel =
-                guild.channels.cache.get(
-                    musicChannel.id
-                );
-
-            if (
-                !voiceChannel ||
-                !voiceChannel.isVoiceBased()
-            ) {
-                console.log(
-                    `❌ VOICE CHANNEL NOT FOUND: ${guildId}`
-                );
-                return;
-            }
-
-            await distube.voices.join(
-                voiceChannel
+        const guild =
+            client.guilds.cache.get(
+                guildId
             );
+
+        if (!guild) return;
+
+        console.log(
+            `⚠️ DISTUBE DISCONNECT: ${guildId}`
+        );
+
+        if (
+            manualLeave.has(guildId)
+        ) {
 
             console.log(
-                `✅ 24/7 RECONNECTED: ${guildId}`
+                `🚪 MANUAL LEAVE - NO RECONNECT: ${guildId}`
             );
 
-        } catch (error) {
-            console.error(
-                `❌ 24/7 RECONNECT ERROR ${guildId}:`,
-                error?.message || error
-            );
+            return;
         }
-    }, 3000);
-});
 
+        if (
+            mode247.get(guildId) !== true
+        ) {
+            return;
+        }
+
+        console.log(
+            `🔄 24/7 RECONNECTING: ${guildId}`
+        );
+
+        clearEmptyTimer(
+            guildId
+        );
+
+        setTimeout(
+            async () => {
+
+                try {
+
+                    if (
+                        mode247.get(guildId) !== true ||
+                        manualLeave.has(guildId)
+                    ) {
+                        return;
+                    }
+
+                    if (
+                        getBotVoiceChannel(
+                            guild
+                        )
+                    ) {
+                        return;
+                    }
+
+                    const saved =
+                        getSavedVoiceChannel(
+                            guildId
+                        );
+
+                    if (!saved) {
+                        console.log(
+                            `⚠️ NO SAVED MUSIC VOICE CHANNEL: ${guildId}`
+                        );
+
+                        return;
+                    }
+
+                    const voiceChannel =
+                        guild.channels.cache.get(
+                            saved.id
+                        );
+
+                    if (
+                        !voiceChannel ||
+                        !voiceChannel.isVoiceBased()
+                    ) {
+
+                        console.log(
+                            `❌ VOICE CHANNEL NOT FOUND: ${guildId}`
+                        );
+
+                        return;
+                    }
+
+                    await distube.voices.join(
+                        voiceChannel
+                    );
+
+                    console.log(
+                        `✅ 24/7 RECONNECTED: ${guildId}`
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        `❌ 24/7 RECONNECT ERROR ${guildId}:`,
+                        error?.message || error
+                    );
+                }
+
+            },
+            3000
+        );
+    }
+);
 
 // ======================================================
 // DELETE QUEUE
 // ======================================================
 
-distube.on('deleteQueue', queue => {
-    console.log(
-        `🗑️ QUEUE DELETED: ${queue.id}`
-    );
-
-    // مهم جداً:
-    // حذف الـQueue لا يعني أن البوت يجب أن يخرج
-    if (mode247.get(queue.id) === true) {
-        clearEmptyTimer(queue.id);
+distube.on(
+    'deleteQueue',
+    queue => {
 
         console.log(
-            `🔴 24/7 ACTIVE - QUEUE DELETED BUT BOT STAYS: ${queue.id}`
+            `🗑️ QUEUE DELETED: ${queue.id}`
         );
-    }
-});
 
+        if (
+            mode247.get(queue.id) === true
+        ) {
+
+            clearEmptyTimer(
+                queue.id
+            );
+
+            console.log(
+                `🔴 24/7 ACTIVE - QUEUE DELETED BUT BOT STAYS: ${queue.id}`
+            );
+        }
+    }
+);
 
 // ======================================================
 // DISTUBE ERROR
@@ -1273,7 +1681,12 @@ distube.on('deleteQueue', queue => {
 
 distube.on(
     'error',
-    async (error, queue, song) => {
+    async (
+        error,
+        queue,
+        song
+    ) => {
+
         console.error(
             '❌ DISTUBE ERROR:',
             error?.message || error
@@ -1284,12 +1697,12 @@ distube.on(
 
         if (!guildId) return;
 
-        // إذا 24/7 مفعّل، لا نسمح للخطأ
-        // أن يسبب خروج البوت
         if (
             mode247.get(guildId) === true
         ) {
-            clearEmptyTimer(guildId);
+            clearEmptyTimer(
+                guildId
+            );
         }
 
         const channel =
@@ -1298,10 +1711,10 @@ distube.on(
 
         if (!channel) return;
 
-        // إذا في أغنية بعدها، جربها
         if (
             queue?.songs?.length > 1
         ) {
+
             try {
                 await queue.skip();
                 return;
@@ -1329,841 +1742,667 @@ distube.on(
 // PANEL AUTO UPDATE
 // ======================================================
 
-setInterval(async () => {
-    for (const guildId of musicPanels.keys()) {
-        try {
-            await updateMusicPanel(guildId);
-        } catch (error) {
-            console.error(
-                `❌ PANEL TIMER ERROR ${guildId}:`,
-                error.message
-            );
+setInterval(
+    async () => {
+
+        for (
+            const guildId
+            of musicPanels.keys()
+        ) {
+
+            try {
+
+                await updateMusicPanel(
+                    guildId
+                );
+
+            } catch (error) {
+
+                console.error(
+                    `❌ PANEL TIMER ERROR ${guildId}:`,
+                    error.message
+                );
+            }
         }
-    }
-}, PANEL_UPDATE_INTERVAL);
+
+    },
+    PANEL_UPDATE_INTERVAL
+);
 
 // ======================================================
 // PREFIX COMMANDS
 // ======================================================
 
-client.on('messageCreate', async message => {
-    try {
-        if (
-            message.author.bot ||
-            !message.guild ||
-            !message.content.startsWith(PREFIX)
-        ) return;
-
-        const raw =
-            message.content
-                .slice(PREFIX.length)
-                .trim();
-
-        if (!raw) return;
-
-        const args = raw.split(/\s+/);
-        const command =
-            args.shift()?.toLowerCase();
-
-        const voiceChannel =
-            message.member?.voice?.channel;
-
-        // ==================================================
-        // COMMAND
-        // ==================================================
-
-        if (command === 'command') {
-            return message.reply({
-                embeds: [getCommandListEmbed()]
-            });
-        }
-
-        // ==================================================
-        // PING
-        // ==================================================
-
-        if (command === 'ping') {
-            return message.reply({
-                embeds: [getPingEmbed()]
-            });
-        }
-
-        // ==================================================
-        // PLAY
-        // 5p / 5play
-        // ==================================================
-
-        if (
-            command === 'p' ||
-            command === 'play'
-        ) {
-            if (!voiceChannel) {
-                return message.reply(
-                    '❌ يجب أن تكون في روم صوتي أولاً.'
-                );
-            }
-
-            const query =
-                args.join(' ').trim();
-
-            if (!query) {
-                return message.reply(
-                    '🎵 يجب كتابة اسم الأغنية أو وضع الرابط.'
-                );
-            }
-
-            try {
-                await playMusic({
-                    voiceChannel,
-                    query,
-                    textChannel: message.channel,
-                    member: message.member
-                });
-
-            } catch (error) {
-                console.error(
-                    '❌ PREFIX PLAY ERROR:',
-                    error?.message || error
-                );
-
-                return message.reply(
-                    '❌ لم أستطع تشغيل الأغنية. جرّب اسم الأغنية مرة أخرى أو أرسل رابطاً صحيحاً.'
-                ).catch(() => {});
-            }
-
-            return;
-        }
-
-        // ==================================================
-        // JOIN
-        // ==================================================
-
-        if (command === 'join') {
-            if (!voiceChannel) {
-                return message.reply(
-                    '❌ يجب أن تكون في روم صوتي.'
-                );
-            }
-
-            const guildId =
-                message.guildId;
-
-            setMusicChannel(
-                guildId,
-                message.channel
-            );
-
-            clearEmptyTimer(
-                guildId
-            );
-
-            try {
-                const alreadyInVoice =
-                    getBotVoiceChannel(
-                        message.guild
-                    );
-
-                await distube.voices.join(
-                    voiceChannel
-                );
-
-                if (!alreadyInVoice) {
-                    await sendJoinMessage(
-                        message.channel
-                    );
-                }
-
-                return message.reply(
-                    '✅ تم دخول الروم الصوتي.'
-                );
-
-            } catch (error) {
-                console.error(
-                    '❌ PREFIX JOIN ERROR:',
-                    error?.message || error
-                );
-
-                return message.reply(
-                    '❌ لم أستطع دخول الروم الصوتي.'
-                );
-            }
-        }
-
-        // ==================================================
-        // LEAVE
-        // ==================================================
-
-        if (command === 'leave') {
-            const guildId =
-                message.guildId;
-
-            mode247.set(
-                guildId,
-                false
-            );
-
-            manualLeave.add(
-                guildId
-            );
-
-            clearEmptyTimer(
-                guildId
-            );
-
-            try {
-                await leaveGuildVoice(
-                    message.guild,
-                    true
-                );
-            } catch (error) {
-                console.error(
-                    '❌ PREFIX LEAVE ERROR:',
-                    error?.message || error
-                );
-            }
-
-            setTimeout(
-                () => manualLeave.delete(
-                    guildId
-                ),
-                5000
-            );
-
-            return;
-        }
-
-        // ==================================================
-        // STOP
-        // ==================================================
-
-        if (command === 'stop') {
-            const queue =
-                distube.getQueue(
-                    message.guildId
-                );
-
-            if (!queue) {
-                return message.reply(
-                    '❌ لا توجد موسيقى تعمل حالياً.'
-                );
-            }
-
-            try {
-                await queue.stop();
-            } catch (error) {
-                console.error(
-                    '❌ STOP ERROR:',
-                    error?.message || error
-                );
-            }
-
-            await deleteMusicPanel(
-                message.guildId
-            );
-
-            await sendStopMessage(
-                message.guildId
-            );
-
-            return message.reply(
-                '⏹️ تم إيقاف الموسيقى.'
-            );
-        }
-
-        // ==================================================
-        // SKIP
-        // ==================================================
-
-        if (command === 'skip') {
-            const queue =
-                distube.getQueue(
-                    message.guildId
-                );
-
-            if (!queue) {
-                return message.reply(
-                    '❌ لا توجد موسيقى.'
-                );
-            }
-
-            try {
-                await queue.skip();
-
-                return message.reply(
-                    '⏭️ تم تخطي الأغنية.'
-                );
-
-            } catch (error) {
-                return message.reply(
-                    '❌ لا توجد أغنية أخرى.'
-                );
-            }
-        }
-
-        // ==================================================
-        // PAUSE / RESUME
-        // ==================================================
-
-        if (
-            command === 'pause' ||
-            command === 'resume'
-        ) {
-            const queue =
-                distube.getQueue(
-                    message.guildId
-                );
-
-            if (!queue) {
-                return message.reply(
-                    '❌ لا توجد موسيقى.'
-                );
-            }
-
-            try {
-                if (command === 'pause') {
-                    await queue.pause();
-
-                    await updateMusicPanel(
-                        message.guildId
-                    );
-
-                    return message.reply(
-                        '⏸️ تم إيقاف الموسيقى مؤقتاً.'
-                    );
-                }
-
-                await queue.resume();
-
-                await updateMusicPanel(
-                    message.guildId
-                );
-
-                return message.reply(
-                    '▶️ تم استئناف الموسيقى.'
-                );
-
-            } catch (error) {
-                console.error(
-                    '❌ PAUSE/RESUME ERROR:',
-                    error?.message || error
-                );
-
-                return message.reply(
-                    '❌ تعذر تنفيذ الأمر.'
-                );
-            }
-        }
-
-        // ==================================================
-        // 24/7
-        // ==================================================
-
-        if (command === '247') {
-            const guildId =
-                message.guildId;
-
-            const enabled =
-                mode247.get(guildId) === true;
-
-            // ----------------------------------------------
-            // DISABLE 24/7
-            // ----------------------------------------------
-
-            if (enabled) {
-                mode247.set(
-                    guildId,
-                    false
-                );
-
-                const channel =
-                    getBotVoiceChannel(
-                        message.guild
-                    );
-
-                if (
-                    channel &&
-                    !hasHumanMembers(channel)
-                ) {
-                    startEmptyTimer(
-                        message.guild
-                    );
-                }
-
-                return message.reply({
-                    embeds: [
-                        redEmbed().setDescription(
-                            `🔴 **RED MUSIC 24/7**\n\n` +
-                            `الحالة: **متوقف ❌**\n\n` +
-                            `⏱️ إذا كان الروم فارغاً سيخرج البوت بعد **5 دقائق**.`
-                        )
-                    ]
-                });
-            }
-
-            // ----------------------------------------------
-            // ENABLE 24/7
-            // ----------------------------------------------
-
-            if (!voiceChannel) {
-                return message.reply(
-                    '❌ يجب أن تكون في روم صوتي حتى تفعل 24/7.'
-                );
-            }
-
-            mode247.set(
-                guildId,
-                true
-            );
-
-            setMusicChannel(
-                guildId,
-                message.channel
-            );
-
-            clearEmptyTimer(
-                guildId
-            );
-
-            try {
-                await distube.voices.join(
-                    voiceChannel
-                );
-
-            } catch (error) {
-                mode247.set(
-                    guildId,
-                    false
-                );
-
-                console.error(
-                    '❌ PREFIX 247 ERROR:',
-                    error?.message || error
-                );
-
-                return message.reply(
-                    '❌ لم أستطع دخول الروم لتفعيل 24/7.'
-                );
-            }
-
-            return message.reply({
-                embeds: [
-                    redEmbed().setDescription(
-                        `🔴 **RED MUSIC 24/7**\n\n` +
-                        `الحالة: **مفعّل ✅**\n\n` +
-                        `🎧 البوت سيبقى في الروم حتى تقوم بإيقاف **24/7**.`
-                    )
-                ]
-            });
-        }
-
-        // ==================================================
-        // SEEK
-        // ==================================================
-
-        if (command === 'seek') {
-            const seconds =
-                Number(args[0]);
-
-            const queue =
-                distube.getQueue(
-                    message.guildId
-                );
+client.on(
+    'messageCreate',
+    async message => {
+
+        try {
 
             if (
-                !Number.isFinite(seconds) ||
-                seconds < 0
+                message.author.bot ||
+                !message.guild ||
+                !message.content.startsWith(PREFIX)
             ) {
-                return message.reply(
-                    '❌ اكتب عدد ثواني صحيح.'
-                );
+                return;
             }
 
-            if (!queue) {
-                return message.reply(
-                    '❌ لا توجد أغنية تعمل.'
-                );
-            }
+            const raw =
+                message.content
+                    .slice(PREFIX.length)
+                    .trim();
 
-            try {
-                await queue.seek(
-                    seconds
-                );
+            if (!raw) return;
 
-                await updateMusicPanel(
-                    message.guildId
-                );
+            const args =
+                raw.split(/\s+/);
 
-                return message.reply(
-                    `⏩ تم الانتقال إلى \`${formatTime(seconds)}\`.`
-                );
-
-            } catch (error) {
-                console.error(
-                    '❌ SEEK ERROR:',
-                    error?.message || error
-                );
-
-                return message.reply(
-                    '❌ لا يمكن الانتقال لهذا الوقت.'
-                );
-            }
-        }
-
-        // ==================================================
-        // PLAYLISTS
-        // ==================================================
-
-        if (command === 'list') {
-            const sub =
+            const command =
                 args.shift()?.toLowerCase();
 
-            if (!sub) {
-                return message.reply(
-                    '❌ استخدم: `5list create` أو `5list add` أو `5list show` أو `5list play`'
-                );
-            }
+            const voiceChannel =
+                message.member?.voice?.channel;
 
-            // ----------------------------------------------
-            // CREATE
-            // ----------------------------------------------
+            // ==================================================
+            // COMMAND
+            // ==================================================
 
-            if (sub === 'create') {
-                const name =
-                    args.join(' ').trim();
-
-                if (!name) {
-                    return message.reply(
-                        '❌ اكتب اسم القائمة.'
-                    );
-                }
-
-                try {
-                    const playlist =
-                        createPlaylist(
-                            message.guildId,
-                            name
-                        );
-
-                    return message.reply(
-                        `✅ تم إنشاء قائمة **${playlist.name}**.`
-                    );
-
-                } catch (error) {
-                    return message.reply(
-                        `❌ ${error.message}`
-                    );
-                }
-            }
-
-            // ----------------------------------------------
-            // ADD
-            // ----------------------------------------------
-
-            if (sub === 'add') {
-                const name =
-                    args.shift();
-
-                const song =
-                    args.join(' ').trim();
-
-                if (!name || !song) {
-                    return message.reply(
-                        '❌ الاستخدام: `5list add اسم_القائمة اسم_الأغنية`'
-                    );
-                }
-
-                try {
-                    const playlist =
-                        addToPlaylist(
-                            message.guildId,
-                            name,
-                            song
-                        );
-
-                    return message.reply(
-                        `✅ تمت إضافة **${song}** إلى قائمة **${playlist.name}**.`
-                    );
-
-                } catch (error) {
-                    return message.reply(
-                        `❌ ${error.message}`
-                    );
-                }
-            }
-
-            // ----------------------------------------------
-            // SHOW
-            // ----------------------------------------------
-
-            if (sub === 'show') {
-                const lists =
-                    getGuildPlaylists(
-                        message.guildId
-                    );
-
-                if (!lists.size) {
-                    return message.reply(
-                        '📋 لا توجد قوائم محفوظة.'
-                    );
-                }
-
-                const text =
-                    [...lists.values()]
-                        .map(
-                            list =>
-                                `📁 **${list.name}** — ${list.songs.length} أغنية`
-                        )
-                        .join('\n');
+            if (
+                command === 'command'
+            ) {
 
                 return message.reply({
                     embeds: [
-                        redEmbed()
-                            .setAuthor({
-                                name:
-                                    '𝐑𝐄𝐃 𝐌𝐔𝐒𝐈𝐂 • LISTS'
-                            })
-                            .setTitle(
-                                '📋 قوائمك'
-                            )
-                            .setDescription(
-                                text
-                            )
+                        getCommandListEmbed()
                     ]
                 });
             }
 
-            // ----------------------------------------------
-            // PLAY
-            // ----------------------------------------------
+            // ==================================================
+            // PING
+            // ==================================================
 
-            if (sub === 'play') {
+            if (
+                command === 'ping'
+            ) {
+
+                return message.reply({
+                    embeds: [
+                        getPingEmbed()
+                    ]
+                });
+            }
+
+            // ==================================================
+            // PLAY
+            // ==================================================
+
+            if (
+                command === 'p' ||
+                command === 'play'
+            ) {
+
                 if (!voiceChannel) {
                     return message.reply(
                         '❌ يجب أن تكون في روم صوتي أولاً.'
                     );
                 }
 
-                const name =
+                const query =
                     args.join(' ').trim();
 
-                if (!name) {
+                if (!query) {
                     return message.reply(
-                        '❌ اكتب اسم القائمة.'
-                    );
-                }
-
-                const playlist =
-                    getGuildPlaylists(
-                        message.guildId
-                    ).get(
-                        name.toLowerCase()
-                    );
-
-                if (!playlist) {
-                    return message.reply(
-                        '❌ القائمة غير موجودة.'
+                        '🎵 يجب كتابة اسم الأغنية أو وضع الرابط.'
                     );
                 }
 
                 try {
-                    await playPlaylist({
-                        guildId:
-                            message.guildId,
+
+                    await playMusic({
                         voiceChannel,
+                        query,
                         textChannel:
                             message.channel,
                         member:
-                            message.member,
-                        playlist
+                            message.member
                     });
 
-                    return message.reply(
-                        `▶️ تم تشغيل قائمة **${playlist.name}**.`
-                    );
-
                 } catch (error) {
+
                     console.error(
-                        '❌ PLAYLIST ERROR:',
+                        '❌ PREFIX PLAY ERROR:',
                         error?.message || error
                     );
 
                     return message.reply(
-                        '❌ حدث خطأ أثناء تشغيل القائمة.'
+                        '❌ لم أستطع تشغيل الأغنية. جرّب اسم الأغنية مرة أخرى أو أرسل رابطاً صحيحاً.'
+                    ).catch(() => {});
+                }
+
+                return;
+            }
+
+            // ==================================================
+            // JOIN
+            // ==================================================
+
+            if (
+                command === 'join'
+            ) {
+
+                if (!voiceChannel) {
+                    return message.reply(
+                        '❌ يجب أن تكون في روم صوتي.'
+                    );
+                }
+
+                const guildId =
+                    message.guildId;
+
+                setMusicChannel(
+                    guildId,
+                    message.channel
+                );
+
+                setSavedVoiceChannel(
+                    guildId,
+                    voiceChannel
+                );
+
+                clearEmptyTimer(
+                    guildId
+                );
+
+                try {
+
+                    const alreadyInVoice =
+                        getBotVoiceChannel(
+                            message.guild
+                        );
+
+                    await distube.voices.join(
+                        voiceChannel
+                    );
+
+                    if (!alreadyInVoice) {
+                        await sendJoinMessage(
+                            message.channel
+                        );
+                    }
+
+                    return message.reply(
+                        '✅ تم دخول الروم الصوتي.'
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        '❌ PREFIX JOIN ERROR:',
+                        error?.message || error
+                    );
+
+                    return message.reply(
+                        '❌ لم أستطع دخول الروم الصوتي.'
                     );
                 }
             }
-        }
 
-    } catch (error) {
-        console.error(
-            '❌ MESSAGE COMMAND ERROR:',
-            error
-        );
-    }
-});
+            // ==================================================
+            // LEAVE
+            // ==================================================
 
+            if (
+                command === 'leave'
+            ) {
 
-// ======================================================
-// INTERACTIONS
-// ======================================================
+                const guildId =
+                    message.guildId;
 
-client.on('interactionCreate', async interaction => {
-    try {
-        // ==================================================
-        // SLASH COMMANDS
-        // ==================================================
+                mode247.set(
+                    guildId,
+                    false
+                );
 
-        if (interaction.isChatInputCommand()) {
-            const command = interaction.commandName;
-            const guild = interaction.guild;
-            const guildId = interaction.guildId;
-            const member = interaction.member;
-            const voiceChannel = member?.voice?.channel;
+                manualLeave.add(
+                    guildId
+                );
 
-            if (command === 'command') {
-                return interaction.reply({
-                    embeds: [getCommandListEmbed()],
-                    ephemeral: true
-                });
-            }
-
-            if (command === 'ping') {
-                return interaction.reply({
-                    embeds: [getPingEmbed()]
-                });
-            }
-
-            if (command === 'play') {
-                if (!voiceChannel) {
-                    return interaction.reply({
-                        content:
-                            '❌ يجب أن تكون في روم صوتي أولاً.',
-                        ephemeral: true
-                    });
-                }
-
-                const query =
-                    interaction.options.getString('song');
-
-                await interaction.deferReply({
-                    ephemeral: true
-                });
+                clearEmptyTimer(
+                    guildId
+                );
 
                 try {
-                    await playMusic({
-                        voiceChannel,
-                        query,
-                        textChannel: interaction.channel,
-                        member
-                    });
 
-                    return interaction.editReply({
-                        content:
-                            '✅ تم إرسال الأغنية إلى RED MUSIC.'
-                    });
+                    await leaveGuildVoice(
+                        message.guild,
+                        true
+                    );
+
                 } catch (error) {
-                    console.error('❌ SLASH PLAY:', error);
 
-                    return interaction.editReply({
-                        content:
-                            `❌ لم أستطع تشغيل الأغنية.\n> ${String(error?.message || 'Unknown error').slice(0, 1500)}`
-                    });
+                    console.error(
+                        '❌ PREFIX LEAVE ERROR:',
+                        error?.message || error
+                    );
+                }
+
+                setTimeout(
+                    () =>
+                        manualLeave.delete(
+                            guildId
+                        ),
+                    5000
+                );
+
+                return;
+            }
+
+            // ==================================================
+            // STOP
+            // ==================================================
+
+            if (
+                command === 'stop'
+            ) {
+
+                const queue =
+                    distube.getQueue(
+                        message.guildId
+                    );
+
+                if (!queue) {
+                    return message.reply(
+                        '❌ لا توجد موسيقى تعمل حالياً.'
+                    );
+                }
+
+                try {
+                    await queue.stop();
+                } catch (error) {
+                    console.error(
+                        '❌ STOP ERROR:',
+                        error?.message || error
+                    );
+                }
+
+                await deleteMusicPanel(
+                    message.guildId
+                );
+
+                await sendStopMessage(
+                    message.guildId
+                );
+
+                return message.reply(
+                    '⏹️ تم إيقاف الموسيقى.'
+                );
+            }
+
+            // ==================================================
+            // SKIP
+            // ==================================================
+
+            if (
+                command === 'skip'
+            ) {
+
+                const queue =
+                    distube.getQueue(
+                        message.guildId
+                    );
+
+                if (!queue) {
+                    return message.reply(
+                        '❌ لا توجد موسيقى.'
+                    );
+                }
+
+                try {
+
+                    await queue.skip();
+
+                    return message.reply(
+                        '⏭️ تم تخطي الأغنية.'
+                    );
+
+                } catch {
+
+                    return message.reply(
+                        '❌ لا توجد أغنية أخرى.'
+                    );
                 }
             }
 
-            if (command === 'playlist' || command === 'lista') {
-                const queue = distube.getQueue(guildId);
+            // ==================================================
+            // PAUSE / RESUME
+            // ==================================================
 
-                if (!queue?.songs?.length) {
-                    return interaction.reply({
-                        content:
-                            '❌ القائمة فارغة حالياً.',
-                        ephemeral: true
+            if (
+                command === 'pause' ||
+                command === 'resume'
+            ) {
+
+                const queue =
+                    distube.getQueue(
+                        message.guildId
+                    );
+
+                if (!queue) {
+                    return message.reply(
+                        '❌ لا توجد موسيقى.'
+                    );
+                }
+
+                try {
+
+                    if (
+                        command === 'pause'
+                    ) {
+
+                        await queue.pause();
+
+                        await updateMusicPanel(
+                            message.guildId
+                        );
+
+                        return message.reply(
+                            '⏸️ تم إيقاف الموسيقى مؤقتاً.'
+                        );
+                    }
+
+                    await queue.resume();
+
+                    await updateMusicPanel(
+                        message.guildId
+                    );
+
+                    return message.reply(
+                        '▶️ تم استئناف الموسيقى.'
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        '❌ PAUSE/RESUME ERROR:',
+                        error?.message || error
+                    );
+
+                    return message.reply(
+                        '❌ تعذر تنفيذ الأمر.'
+                    );
+                }
+            }
+
+            // ==================================================
+            // 24/7
+            // ==================================================
+
+            if (
+                command === '247'
+            ) {
+
+                const guildId =
+                    message.guildId;
+
+                const enabled =
+                    mode247.get(
+                        guildId
+                    ) === true;
+
+                if (enabled) {
+
+                    mode247.set(
+                        guildId,
+                        false
+                    );
+
+                    const channel =
+                        getBotVoiceChannel(
+                            message.guild
+                        );
+
+                    if (
+                        channel &&
+                        !hasHumanMembers(channel)
+                    ) {
+
+                        startEmptyTimer(
+                            message.guild
+                        );
+                    }
+
+                    return message.reply({
+                        embeds: [
+                            redEmbed()
+                                .setDescription(
+                                    `🔴 **RED MUSIC 24/7**\n\n` +
+                                    `الحالة: **متوقف ❌**\n\n` +
+                                    `⏱️ إذا كان الروم فارغاً سيخرج البوت بعد **5 دقائق**.`
+                                )
+                        ]
                     });
                 }
 
-                const list = queue.songs
-                    .slice(0, 20)
-                    .map(
-                        (song, i) =>
-                            `**${i + 1}.** 🎵 ${song.name}\n` +
-                            `└ ⏱️ \`${song.formattedDuration || formatTime(song.duration)}\``
-                    )
-                    .join('\n\n');
+                if (!voiceChannel) {
+                    return message.reply(
+                        '❌ يجب أن تكون في روم صوتي حتى تفعل 24/7.'
+                    );
+                }
 
-                return interaction.reply({
+                mode247.set(
+                    guildId,
+                    true
+                );
+
+                setMusicChannel(
+                    guildId,
+                    message.channel
+                );
+
+                setSavedVoiceChannel(
+                    guildId,
+                    voiceChannel
+                );
+
+                clearEmptyTimer(
+                    guildId
+                );
+
+                try {
+
+                    await distube.voices.join(
+                        voiceChannel
+                    );
+
+                } catch (error) {
+
+                    mode247.set(
+                        guildId,
+                        false
+                    );
+
+                    console.error(
+                        '❌ PREFIX 247 ERROR:',
+                        error?.message || error
+                    );
+
+                    return message.reply(
+                        '❌ لم أستطع دخول الروم لتفعيل 24/7.'
+                    );
+                }
+
+                return message.reply({
                     embeds: [
                         redEmbed()
-                            .setAuthor({
-                                name: '𝐑𝐄𝐃 𝐌𝐔𝐒𝐈𝐂 • PLAYLIST'
-                            })
-                            .setTitle('📋 قائمة التشغيل')
-                            .setDescription(list)
-                            .setFooter({
-                                text: `${queue.songs.length} Songs`
-                            })
-                    ],
-                    ephemeral: true
+                            .setDescription(
+                                `🔴 **RED MUSIC 24/7**\n\n` +
+                                `الحالة: **مفعّل ✅**\n\n` +
+                                `🎧 البوت سيبقى في الروم حتى تقوم بإيقاف **24/7**.`
+                            )
+                    ]
                 });
             }
 
-            if (command === 'list') {
-                const sub =
-                    interaction.options.getSubcommand();
+            // ==================================================
+            // SEEK
+            // ==================================================
 
-                if (sub === 'create') {
+            if (
+                command === 'seek'
+            ) {
+
+                const seconds =
+                    Number(args[0]);
+
+                const queue =
+                    distube.getQueue(
+                        message.guildId
+                    );
+
+                if (
+                    !Number.isFinite(seconds) ||
+                    seconds < 0
+                ) {
+
+                    return message.reply(
+                        '❌ اكتب عدد ثواني صحيح.'
+                    );
+                }
+
+                if (!queue) {
+                    return message.reply(
+                        '❌ لا توجد أغنية تعمل.'
+                    );
+                }
+
+                try {
+
+                    await queue.seek(
+                        seconds
+                    );
+
+                    await updateMusicPanel(
+                        message.guildId
+                    );
+
+                    return message.reply(
+                        `⏩ تم الانتقال إلى \`${formatTime(seconds)}\`.`
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        '❌ SEEK ERROR:',
+                        error?.message || error
+                    );
+
+                    return message.reply(
+                        '❌ لا يمكن الانتقال لهذا الوقت.'
+                    );
+                }
+            }
+
+            // ==================================================
+            // PLAYLISTS
+            // ==================================================
+
+            if (
+                command === 'list'
+            ) {
+
+                const sub =
+                    args.shift()?.toLowerCase();
+
+                if (!sub) {
+                    return message.reply(
+                        '❌ استخدم: `5list create` أو `5list add` أو `5list show` أو `5list play`'
+                    );
+                }
+
+                if (
+                    sub === 'create'
+                ) {
+
+                    const name =
+                        args.join(' ').trim();
+
+                    if (!name) {
+                        return message.reply(
+                            '❌ اكتب اسم القائمة.'
+                        );
+                    }
+
                     try {
+
                         const playlist =
                             createPlaylist(
-                                guildId,
-                                interaction.options.getString('name')
+                                message.guildId,
+                                name
                             );
 
-                        return interaction.reply({
-                            content:
-                                `✅ تم إنشاء قائمة **${playlist.name}**.`,
-                            ephemeral: true
-                        });
+                        return message.reply(
+                            `✅ تم إنشاء قائمة **${playlist.name}**.`
+                        );
+
                     } catch (error) {
-                        return interaction.reply({
-                            content: `❌ ${error.message}`,
-                            ephemeral: true
-                        });
+
+                        return message.reply(
+                            `❌ ${error.message}`
+                        );
                     }
                 }
 
-                if (sub === 'add') {
+                if (
+                    sub === 'add'
+                ) {
+
+                    const name =
+                        args.shift();
+
+                    const song =
+                        args.join(' ').trim();
+
+                    if (!name || !song) {
+                        return message.reply(
+                            '❌ الاستخدام: `5list add اسم_القائمة اسم_الأغنية`'
+                        );
+                    }
+
                     try {
+
                         const playlist =
                             addToPlaylist(
-                                guildId,
-                                interaction.options.getString('name'),
-                                interaction.options.getString('song')
+                                message.guildId,
+                                name,
+                                song
                             );
 
-                        return interaction.reply({
-                            content:
-                                `✅ تمت إضافة الأغنية إلى قائمة **${playlist.name}**.`,
-                            ephemeral: true
-                        });
+                        return message.reply(
+                            `✅ تمت إضافة **${song}** إلى قائمة **${playlist.name}**.`
+                        );
+
                     } catch (error) {
-                        return interaction.reply({
-                            content: `❌ ${error.message}`,
-                            ephemeral: true
-                        });
+
+                        return message.reply(
+                            `❌ ${error.message}`
+                        );
                     }
                 }
 
-                if (sub === 'show') {
+                if (
+                    sub === 'show'
+                ) {
+
                     const lists =
-                        getGuildPlaylists(guildId);
+                        getGuildPlaylists(
+                            message.guildId
+                        );
 
                     if (!lists.size) {
-                        return interaction.reply({
-                            content:
-                                '📋 لا توجد قوائم محفوظة.',
-                            ephemeral: true
-                        });
+                        return message.reply(
+                            '📋 لا توجد قوائم محفوظة.'
+                        );
                     }
 
                     const text =
@@ -2174,21 +2413,168 @@ client.on('interactionCreate', async interaction => {
                             )
                             .join('\n');
 
-                    return interaction.reply({
+                    return message.reply({
                         embeds: [
                             redEmbed()
                                 .setAuthor({
                                     name:
                                         '𝐑𝐄𝐃 𝐌𝐔𝐒𝐈𝐂 • LISTS'
                                 })
-                                .setTitle('📋 القوائم المحفوظة')
-                                .setDescription(text)
+                                .setTitle(
+                                    '📋 قوائمك'
+                                )
+                                .setDescription(
+                                    text
+                                )
+                        ]
+                    });
+                }
+
+                if (
+                    sub === 'play'
+                ) {
+
+                    if (!voiceChannel) {
+                        return message.reply(
+                            '❌ يجب أن تكون في روم صوتي أولاً.'
+                        );
+                    }
+
+                    const name =
+                        args.join(' ').trim();
+
+                    if (!name) {
+                        return message.reply(
+                            '❌ اكتب اسم القائمة.'
+                        );
+                    }
+
+                    const playlist =
+                        getGuildPlaylists(
+                            message.guildId
+                        ).get(
+                            name.toLowerCase()
+                        );
+
+                    if (!playlist) {
+                        return message.reply(
+                            '❌ القائمة غير موجودة.'
+                        );
+                    }
+
+                    try {
+
+                        await playPlaylist({
+                            guildId:
+                                message.guildId,
+                            voiceChannel,
+                            textChannel:
+                                message.channel,
+                            member:
+                                message.member,
+                            playlist
+                        });
+
+                        return message.reply(
+                            `▶️ تم تشغيل قائمة **${playlist.name}**.`
+                        );
+
+                    } catch (error) {
+
+                        console.error(
+                            '❌ PLAYLIST ERROR:',
+                            error?.message || error
+                        );
+
+                        return message.reply(
+                            '❌ حدث خطأ أثناء تشغيل القائمة.'
+                        );
+                    }
+                }
+            }
+
+        } catch (error) {
+
+            console.error(
+                '❌ MESSAGE COMMAND ERROR:',
+                error
+            );
+        }
+    }
+);
+
+// ======================================================
+// INTERACTIONS
+// ======================================================
+
+client.on(
+    'interactionCreate',
+    async interaction => {
+
+        try {
+
+            // ==================================================
+            // SLASH COMMANDS
+            // ==================================================
+
+            if (
+                interaction.isChatInputCommand()
+            ) {
+
+                const command =
+                    interaction.commandName;
+
+                const guild =
+                    interaction.guild;
+
+                const guildId =
+                    interaction.guildId;
+
+                const member =
+                    interaction.member;
+
+                const voiceChannel =
+                    member?.voice?.channel;
+
+                // ==================================================
+                // COMMAND
+                // ==================================================
+
+                if (
+                    command === 'command'
+                ) {
+
+                    return interaction.reply({
+                        embeds: [
+                            getCommandListEmbed()
                         ],
                         ephemeral: true
                     });
                 }
 
-                if (sub === 'play') {
+                // ==================================================
+                // PING
+                // ==================================================
+
+                if (
+                    command === 'ping'
+                ) {
+
+                    return interaction.reply({
+                        embeds: [
+                            getPingEmbed()
+                        ]
+                    });
+                }
+
+                // ==================================================
+                // PLAY
+                // ==================================================
+
+                if (
+                    command === 'play'
+                ) {
+
                     if (!voiceChannel) {
                         return interaction.reply({
                             content:
@@ -2197,527 +2583,1105 @@ client.on('interactionCreate', async interaction => {
                         });
                     }
 
-                    const name =
-                        interaction.options.getString('name');
-
-                    const playlist =
-                        getGuildPlaylists(guildId)
-                            .get(name.toLowerCase());
-
-                    if (!playlist) {
-                        return interaction.reply({
-                            content:
-                                '❌ القائمة غير موجودة.',
-                            ephemeral: true
-                        });
-                    }
-
-                    if (!playlist.songs.length) {
-                        return interaction.reply({
-                            content:
-                                '❌ القائمة فارغة.',
-                            ephemeral: true
-                        });
-                    }
+                    const query =
+                        interaction.options.getString(
+                            'song'
+                        );
 
                     await interaction.deferReply({
                         ephemeral: true
                     });
 
                     try {
-                        await playPlaylist({
-                            guildId,
+
+                        await playMusic({
                             voiceChannel,
-                            textChannel: interaction.channel,
-                            member,
-                            playlist
+                            query,
+                            textChannel:
+                                interaction.channel,
+                            member
                         });
 
                         return interaction.editReply({
                             content:
-                                `▶️ تم تشغيل قائمة **${playlist.name}**.`
+                                '✅ تم إرسال الأغنية إلى RED MUSIC.'
                         });
+
                     } catch (error) {
-                        console.error('❌ SLASH PLAYLIST:', error);
+
+                        console.error(
+                            '❌ SLASH PLAY:',
+                            error
+                        );
 
                         return interaction.editReply({
                             content:
-                                '❌ حدث خطأ أثناء تشغيل القائمة.'
+                                `❌ لم أستطع تشغيل الأغنية.\n> ${String(error?.message || 'Unknown error').slice(0, 1500)}`
                         });
                     }
                 }
-            }
 
-            if (command === 'join') {
-                if (!voiceChannel) {
-                    return interaction.reply({
-                        content:
-                            '❌ يجب أن تكون في روم صوتي.',
-                        ephemeral: true
-                    });
-                }
+                // ==================================================
+                // PLAYLIST
+                // ==================================================
 
-                setMusicChannel(
-                    guildId,
-                    interaction.channel
-                );
+                if (
+                    command === 'playlist' ||
+                    command === 'lista'
+                ) {
 
-                clearEmptyTimer(guildId);
+                    const queue =
+                        distube.getQueue(
+                            guildId
+                        );
 
-                try {
-                    await distube.voices.join(voiceChannel);
-                    await sendJoinMessage(interaction.channel);
-
-                    });
-                } catch {
-                    return interaction.reply({
-                        content:
-                            '❌ لم أستطع دخول الروم.',
-                        ephemeral: true
-                    });
-                }
-            }
-
-            if (command === 'leave') {
-                mode247.set(guildId, false);
-                manualLeave.add(guildId);
-                clearEmptyTimer(guildId);
-
-                await leaveGuildVoice(guild, true);
-
-                setTimeout(
-                    () => manualLeave.delete(guildId),
-                    5000
-                );
-
-            }
-
-            if (command === 'stop') {
-                const queue = distube.getQueue(guildId);
-
-                if (!queue) {
-                    return interaction.reply({
-                        content:
-                            '❌ لا توجد موسيقى.',
-                        ephemeral: true
-                    });
-                }
-
-                try {
-                    await queue.stop();
-                } catch {}
-
-                await deleteMusicPanel(guildId);
-                await sendStopMessage(guildId);
-
-                return interaction.reply({
-                    content:
-                        '⏹️ تم إيقاف الموسيقى.',
-                    ephemeral: true
-                });
-            }
-
-            if (command === 'skip') {
-                const queue = distube.getQueue(guildId);
-
-                if (!queue) {
-                    return interaction.reply({
-                        content:
-                            '❌ لا توجد موسيقى.',
-                        ephemeral: true
-                    });
-                }
-
-                try {
-                    await queue.skip();
-
-                    return interaction.reply({
-                        content:
-                            '⏭️ تم تخطي الأغنية.',
-                        ephemeral: true
-                    });
-                } catch {
-                    return interaction.reply({
-                        content:
-                            '❌ لا توجد أغنية أخرى.',
-                        ephemeral: true
-                    });
-                }
-            }
-
-            if (command === 'pause' || command === 'resume') {
-                const queue = distube.getQueue(guildId);
-
-                if (!queue) {
-                    return interaction.reply({
-                        content:
-                            '❌ لا توجد موسيقى.',
-                        ephemeral: true
-                    });
-                }
-
-                try {
-                    if (command === 'pause') {
-                        await queue.pause();
-                        await updateMusicPanel(guildId);
+                    if (
+                        !queue?.songs?.length
+                    ) {
 
                         return interaction.reply({
                             content:
-                                '⏸️ تم إيقاف الموسيقى مؤقتاً.',
+                                '❌ القائمة فارغة حالياً.',
                             ephemeral: true
                         });
                     }
 
-                    await queue.resume();
-                    await updateMusicPanel(guildId);
-
-                    return interaction.reply({
-                        content:
-                            '▶️ تم استئناف الموسيقى.',
-                        ephemeral: true
-                    });
-                } catch {
-                    return interaction.reply({
-                        content:
-                            '❌ تعذر تنفيذ الأمر.',
-                        ephemeral: true
-                    });
-                }
-            }
-
-            if (command === 'seek') {
-                const seconds =
-                    interaction.options.getInteger('seconds');
-
-                const queue = distube.getQueue(guildId);
-
-                if (!queue) {
-                    return interaction.reply({
-                        content:
-                            '❌ لا توجد أغنية.',
-                        ephemeral: true
-                    });
-                }
-
-                try {
-                    await queue.seek(seconds);
-                    await updateMusicPanel(guildId);
-
-                    return interaction.reply({
-                        content:
-                            `⏩ تم الانتقال إلى \`${formatTime(seconds)}\`.`,
-                        ephemeral: true
-                    });
-                } catch {
-                    return interaction.reply({
-                        content:
-                            '❌ لا يمكن الانتقال لهذا الوقت.',
-                        ephemeral: true
-                    });
-                }
-            }
-
-            if (command === '247') {
-                const enabled =
-                    mode247.get(guildId) === true;
-
-                if (enabled) {
-                    mode247.set(guildId, false);
-
-                    const channel =
-                        getBotVoiceChannel(guild);
-
-                    if (
-                        channel &&
-                        !hasHumanMembers(channel)
-                    ) {
-                        startEmptyTimer(guild);
-                    }
+                    const list =
+                        queue.songs
+                            .slice(0, 20)
+                            .map(
+                                (song, i) =>
+                                    `**${i + 1}.** 🎵 ${song.name}\n` +
+                                    `└ ⏱️ \`${song.formattedDuration || formatTime(song.duration)}\``
+                            )
+                            .join('\n\n');
 
                     return interaction.reply({
                         embeds: [
-                            redEmbed().setDescription(
-                                `🔴 **RED MUSIC 24/7**\n\n` +
-                                `الحالة: **متوقف ❌**\n\n` +
-                                `⏱️ إذا كان الروم فارغاً سيخرج البوت بعد **5 دقائق**.`
-                            )
+                            redEmbed()
+                                .setAuthor({
+                                    name:
+                                        '𝐑𝐄𝐃 𝐌𝐔𝐒𝐈𝐂 • PLAYLIST'
+                                })
+                                .setTitle(
+                                    '📋 قائمة التشغيل'
+                                )
+                                .setDescription(
+                                    list
+                                )
+                                .setFooter({
+                                    text:
+                                        `${queue.songs.length} Songs`
+                                })
                         ],
                         ephemeral: true
                     });
                 }
 
-                if (!voiceChannel) {
+                // ==================================================
+                // LIST
+                // ==================================================
+
+                if (
+                    command === 'list'
+                ) {
+
+                    const sub =
+                        interaction.options.getSubcommand();
+
+                    if (
+                        sub === 'create'
+                    ) {
+
+                        try {
+
+                            const playlist =
+                                createPlaylist(
+                                    guildId,
+                                    interaction.options.getString(
+                                        'name'
+                                    )
+                                );
+
+                            return interaction.reply({
+                                content:
+                                    `✅ تم إنشاء قائمة **${playlist.name}**.`,
+                                ephemeral: true
+                            });
+
+                        } catch (error) {
+
+                            return interaction.reply({
+                                content:
+                                    `❌ ${error.message}`,
+                                ephemeral: true
+                            });
+                        }
+                    }
+
+                    if (
+                        sub === 'add'
+                    ) {
+
+                        try {
+
+                            const playlist =
+                                addToPlaylist(
+                                    guildId,
+                                    interaction.options.getString(
+                                        'name'
+                                    ),
+                                    interaction.options.getString(
+                                        'song'
+                                    )
+                                );
+
+                            return interaction.reply({
+                                content:
+                                    `✅ تمت إضافة الأغنية إلى قائمة **${playlist.name}**.`,
+                                ephemeral: true
+                            });
+
+                        } catch (error) {
+
+                            return interaction.reply({
+                                content:
+                                    `❌ ${error.message}`,
+                                ephemeral: true
+                            });
+                        }
+                    }
+
+                    if (
+                        sub === 'show'
+                    ) {
+
+                        const lists =
+                            getGuildPlaylists(
+                                guildId
+                            );
+
+                        if (!lists.size) {
+                            return interaction.reply({
+                                content:
+                                    '📋 لا توجد قوائم محفوظة.',
+                                ephemeral: true
+                            });
+                        }
+
+                        const text =
+                            [...lists.values()]
+                                .map(
+                                    list =>
+                                        `📁 **${list.name}** — ${list.songs.length} أغنية`
+                                )
+                                .join('\n');
+
+                        return interaction.reply({
+                            embeds: [
+                                redEmbed()
+                                    .setAuthor({
+                                        name:
+                                            '𝐑𝐄𝐃 𝐌𝐔𝐒𝐈𝐂 • LISTS'
+                                    })
+                                    .setTitle(
+                                        '📋 القوائم المحفوظة'
+                                    )
+                                    .setDescription(
+                                        text
+                                    )
+                            ],
+                            ephemeral: true
+                        });
+                    }
+
+                    if (
+                        sub === 'play'
+                    ) {
+
+                        if (!voiceChannel) {
+                            return interaction.reply({
+                                content:
+                                    '❌ يجب أن تكون في روم صوتي أولاً.',
+                                ephemeral: true
+                            });
+                        }
+
+                        const name =
+                            interaction.options.getString(
+                                'name'
+                            );
+
+                        const playlist =
+                            getGuildPlaylists(
+                                guildId
+                            ).get(
+                                name.toLowerCase()
+                            );
+
+                        if (!playlist) {
+                            return interaction.reply({
+                                content:
+                                    '❌ القائمة غير موجودة.',
+                                ephemeral: true
+                            });
+                        }
+
+                        if (
+                            !playlist.songs.length
+                        ) {
+                            return interaction.reply({
+                                content:
+                                    '❌ القائمة فارغة.',
+                                ephemeral: true
+                            });
+                        }
+
+                        await interaction.deferReply({
+                            ephemeral: true
+                        });
+
+                        try {
+
+                            await playPlaylist({
+                                guildId,
+                                voiceChannel,
+                                textChannel:
+                                    interaction.channel,
+                                member,
+                                playlist
+                            });
+
+                            return interaction.editReply({
+                                content:
+                                    `▶️ تم تشغيل قائمة **${playlist.name}**.`
+                            });
+
+                        } catch (error) {
+
+                            console.error(
+                                '❌ SLASH PLAYLIST:',
+                                error
+                            );
+
+                            return interaction.editReply({
+                                content:
+                                    '❌ حدث خطأ أثناء تشغيل القائمة.'
+                            });
+                        }
+                    }
+                }
+
+                // ==================================================
+                // JOIN
+                // ==================================================
+
+                if (
+                    command === 'join'
+                ) {
+
+                    if (!voiceChannel) {
+                        return interaction.reply({
+                            content:
+                                '❌ يجب أن تكون في روم صوتي.',
+                            ephemeral: true
+                        });
+                    }
+
+                    setMusicChannel(
+                        guildId,
+                        interaction.channel
+                    );
+
+                    setSavedVoiceChannel(
+                        guildId,
+                        voiceChannel
+                    );
+
+                    clearEmptyTimer(
+                        guildId
+                    );
+
+                    try {
+
+                        const alreadyInVoice =
+                            getBotVoiceChannel(
+                                guild
+                            );
+
+                        await distube.voices.join(
+                            voiceChannel
+                        );
+
+                        if (
+                            !alreadyInVoice
+                        ) {
+                            await sendJoinMessage(
+                                interaction.channel
+                            );
+                        }
+
+                        return interaction.reply({
+                            content:
+                                '✅ تم دخول الروم الصوتي.',
+                            ephemeral: true
+                        });
+
+                    } catch (error) {
+
+                        console.error(
+                            '❌ SLASH JOIN ERROR:',
+                            error
+                        );
+
+                        return interaction.reply({
+                            content:
+                                '❌ لم أستطع دخول الروم.',
+                            ephemeral: true
+                        });
+                    }
+                }
+
+                // ==================================================
+                // LEAVE
+                // ==================================================
+
+                if (
+                    command === 'leave'
+                ) {
+
+                    mode247.set(
+                        guildId,
+                        false
+                    );
+
+                    manualLeave.add(
+                        guildId
+                    );
+
+                    clearEmptyTimer(
+                        guildId
+                    );
+
+                    try {
+
+                        await leaveGuildVoice(
+                            guild,
+                            true
+                        );
+
+                    } catch (error) {
+
+                        console.error(
+                            '❌ SLASH LEAVE ERROR:',
+                            error
+                        );
+                    }
+
+                    setTimeout(
+                        () =>
+                            manualLeave.delete(
+                                guildId
+                            ),
+                        5000
+                    );
+
                     return interaction.reply({
                         content:
-                            '❌ يجب أن تكون في روم صوتي حتى تفعل 24/7.',
+                            '👋 تم خروج البوت من الروم.',
                         ephemeral: true
                     });
                 }
 
-                mode247.set(guildId, true);
-                setMusicChannel(guildId, interaction.channel);
-                clearEmptyTimer(guildId);
+                // ==================================================
+                // STOP
+                // ==================================================
 
-                try {
-                    await distube.voices.join(voiceChannel);
-                } catch {
-                    mode247.set(guildId, false);
+                if (
+                    command === 'stop'
+                ) {
+
+                    const queue =
+                        distube.getQueue(
+                            guildId
+                        );
+
+                    if (!queue) {
+                        return interaction.reply({
+                            content:
+                                '❌ لا توجد موسيقى.',
+                            ephemeral: true
+                        });
+                    }
+
+                    try {
+                        await queue.stop();
+                    } catch {}
+
+                    await deleteMusicPanel(
+                        guildId
+                    );
+
+                    await sendStopMessage(
+                        guildId
+                    );
 
                     return interaction.reply({
                         content:
-                            '❌ لم أستطع دخول الروم.',
+                            '⏹️ تم إيقاف الموسيقى.',
                         ephemeral: true
                     });
                 }
 
-                return interaction.reply({
-                    embeds: [
-                        redEmbed().setDescription(
-                            `🔴 **RED MUSIC 24/7**\n\n` +
-                            `الحالة: **مفعّل ✅**\n\n` +
-                            `🎧 لن يخرج البوت تلقائياً حتى تقوم بإيقاف **24/7**.`
-                        )
-                    ],
-                    ephemeral: true
-                });
+                // ==================================================
+                // SKIP
+                // ==================================================
+
+                if (
+                    command === 'skip'
+                ) {
+
+                    const queue =
+                        distube.getQueue(
+                            guildId
+                        );
+
+                    if (!queue) {
+                        return interaction.reply({
+                            content:
+                                '❌ لا توجد موسيقى.',
+                            ephemeral: true
+                        });
+                    }
+
+                    try {
+
+                        await queue.skip();
+
+                        return interaction.reply({
+                            content:
+                                '⏭️ تم تخطي الأغنية.',
+                            ephemeral: true
+                        });
+
+                    } catch {
+
+                        return interaction.reply({
+                            content:
+                                '❌ لا توجد أغنية أخرى.',
+                            ephemeral: true
+                        });
+                    }
+                }
+
+                // ==================================================
+                // PAUSE / RESUME
+                // ==================================================
+
+                if (
+                    command === 'pause' ||
+                    command === 'resume'
+                ) {
+
+                    const queue =
+                        distube.getQueue(
+                            guildId
+                        );
+
+                    if (!queue) {
+                        return interaction.reply({
+                            content:
+                                '❌ لا توجد موسيقى.',
+                            ephemeral: true
+                        });
+                    }
+
+                    try {
+
+                        if (
+                            command === 'pause'
+                        ) {
+
+                            await queue.pause();
+
+                            await updateMusicPanel(
+                                guildId
+                            );
+
+                            return interaction.reply({
+                                content:
+                                    '⏸️ تم إيقاف الموسيقى مؤقتاً.',
+                                ephemeral: true
+                            });
+                        }
+
+                        await queue.resume();
+
+                        await updateMusicPanel(
+                            guildId
+                        );
+
+                        return interaction.reply({
+                            content:
+                                '▶️ تم استئناف الموسيقى.',
+                            ephemeral: true
+                        });
+
+                    } catch {
+
+                        return interaction.reply({
+                            content:
+                                '❌ تعذر تنفيذ الأمر.',
+                            ephemeral: true
+                        });
+                    }
+                }
+
+                // ==================================================
+                // SEEK
+                // ==================================================
+
+                if (
+                    command === 'seek'
+                ) {
+
+                    const seconds =
+                        interaction.options.getInteger(
+                            'seconds'
+                        );
+
+                    const queue =
+                        distube.getQueue(
+                            guildId
+                        );
+
+                    if (!queue) {
+                        return interaction.reply({
+                            content:
+                                '❌ لا توجد أغنية.',
+                            ephemeral: true
+                        });
+                    }
+
+                    try {
+
+                        await queue.seek(
+                            seconds
+                        );
+
+                        await updateMusicPanel(
+                            guildId
+                        );
+
+                        return interaction.reply({
+                            content:
+                                `⏩ تم الانتقال إلى \`${formatTime(seconds)}\`.`,
+                            ephemeral: true
+                        });
+
+                    } catch {
+
+                        return interaction.reply({
+                            content:
+                                '❌ لا يمكن الانتقال لهذا الوقت.',
+                            ephemeral: true
+                        });
+                    }
+                }
+
+                // ==================================================
+                // 24/7
+                // ==================================================
+
+                if (
+                    command === '247'
+                ) {
+
+                    const enabled =
+                        mode247.get(
+                            guildId
+                        ) === true;
+
+                    if (enabled) {
+
+                        mode247.set(
+                            guildId,
+                            false
+                        );
+
+                        const channel =
+                            getBotVoiceChannel(
+                                guild
+                            );
+
+                        if (
+                            channel &&
+                            !hasHumanMembers(channel)
+                        ) {
+
+                            startEmptyTimer(
+                                guild
+                            );
+                        }
+
+                        return interaction.reply({
+                            embeds: [
+                                redEmbed()
+                                    .setDescription(
+                                        `🔴 **RED MUSIC 24/7**\n\n` +
+                                        `الحالة: **متوقف ❌**\n\n` +
+                                        `⏱️ إذا كان الروم فارغاً سيخرج البوت بعد **5 دقائق**.`
+                                    )
+                            ],
+                            ephemeral: true
+                        });
+                    }
+
+                    if (!voiceChannel) {
+                        return interaction.reply({
+                            content:
+                                '❌ يجب أن تكون في روم صوتي حتى تفعل 24/7.',
+                            ephemeral: true
+                        });
+                    }
+
+                    mode247.set(
+                        guildId,
+                        true
+                    );
+
+                    setMusicChannel(
+                        guildId,
+                        interaction.channel
+                    );
+
+                    setSavedVoiceChannel(
+                        guildId,
+                        voiceChannel
+                    );
+
+                    clearEmptyTimer(
+                        guildId
+                    );
+
+                    try {
+
+                        await distube.voices.join(
+                            voiceChannel
+                        );
+
+                    } catch {
+
+                        mode247.set(
+                            guildId,
+                            false
+                        );
+
+                        return interaction.reply({
+                            content:
+                                '❌ لم أستطع دخول الروم.',
+                            ephemeral: true
+                        });
+                    }
+
+                    return interaction.reply({
+                        embeds: [
+                            redEmbed()
+                                .setDescription(
+                                    `🔴 **RED MUSIC 24/7**\n\n` +
+                                    `الحالة: **مفعّل ✅**\n\n` +
+                                    `🎧 لن يخرج البوت تلقائياً حتى تقوم بإيقاف **24/7**.`
+                                )
+                        ],
+                        ephemeral: true
+                    });
+                }
             }
-        }
 
-
-        // ==================================================
-        // BUTTONS
-        // ==================================================
-
-        if (interaction.isButton()) {
-            const guild = interaction.guild;
-            const guildId = interaction.guildId;
-            const member = interaction.member;
-            const id = interaction.customId;
-
-            if (!isInVoice(member)) {
-                return interaction.reply({
-                    content:
-                        '❌ يجب أن تكون داخل روم صوتي حتى تتحكم بالموسيقى.',
-                    ephemeral: true
-                });
-            }
+            // ==================================================
+            // BUTTONS
+            // ==================================================
 
             if (
-                getBotVoiceChannel(guild) &&
-                !sameVoiceAsBot(member, guild)
+                interaction.isButton()
             ) {
-                return interaction.reply({
-                    content:
-                        '❌ يجب أن تكون في نفس الروم الصوتي مع RED MUSIC.',
-                    ephemeral: true
-                });
-            }
 
-            const queue = distube.getQueue(guildId);
+                const guild =
+                    interaction.guild;
 
-            if (!queue) {
-                return interaction.reply({
-                    content:
-                        '❌ لا توجد موسيقى تعمل حالياً.',
-                    ephemeral: true
-                });
-            }
+                const guildId =
+                    interaction.guildId;
 
-            if (id === 'btn_prev') {
-                try {
-                    await interaction.deferUpdate();
-                    await queue.previous();
-                    await updateMusicPanel(guildId);
-                } catch {
-                    await interaction.followUp({
+                const member =
+                    interaction.member;
+
+                const id =
+                    interaction.customId;
+
+                if (!isInVoice(member)) {
+                    return interaction.reply({
                         content:
-                            '❌ لا توجد أغنية سابقة.',
+                            '❌ يجب أن تكون داخل روم صوتي حتى تتحكم بالموسيقى.',
                         ephemeral: true
+                    });
+                }
+
+                if (
+                    getBotVoiceChannel(guild) &&
+                    !sameVoiceAsBot(
+                        member,
+                        guild
+                    )
+                ) {
+
+                    return interaction.reply({
+                        content:
+                            '❌ يجب أن تكون في نفس الروم الصوتي مع RED MUSIC.',
+                        ephemeral: true
+                    });
+                }
+
+                const queue =
+                    distube.getQueue(
+                        guildId
+                    );
+
+                if (!queue) {
+                    return interaction.reply({
+                        content:
+                            '❌ لا توجد موسيقى تعمل حالياً.',
+                        ephemeral: true
+                    });
+                }
+
+                // ==================================================
+                // PREVIOUS
+                // ==================================================
+
+                if (
+                    id === 'btn_prev'
+                ) {
+
+                    try {
+
+                        await interaction.deferUpdate();
+
+                        await queue.previous();
+
+                        await updateMusicPanel(
+                            guildId
+                        );
+
+                    } catch {
+
+                        await interaction.followUp({
+                            content:
+                                '❌ لا توجد أغنية سابقة.',
+                            ephemeral: true
+                        }).catch(() => {});
+                    }
+
+                    return;
+                }
+
+                // ==================================================
+                // SEEK BUTTONS
+                // ==================================================
+
+                if (
+                    id === 'btn_back10' ||
+                    id === 'btn_forward10' ||
+                    id === 'btn_back30' ||
+                    id === 'btn_forward30'
+                ) {
+
+                    await interaction.deferUpdate();
+
+                    const current =
+                        Number(
+                            queue.currentTime
+                        ) || 0;
+
+                    const duration =
+                        Number(
+                            queue.songs[0]?.duration
+                        ) || 0;
+
+                    const amount =
+                        id === 'btn_back10'
+                            ? -10
+                            : id === 'btn_forward10'
+                                ? 10
+                                : id === 'btn_back30'
+                                    ? -30
+                                    : 30;
+
+                    const target =
+                        Math.max(
+                            0,
+                            Math.min(
+                                duration || Infinity,
+                                current + amount
+                            )
+                        );
+
+                    await queue.seek(
+                        target
+                    );
+
+                    await updateMusicPanel(
+                        guildId
+                    );
+
+                    return;
+                }
+
+                // ==================================================
+                // PAUSE
+                // ==================================================
+
+                if (
+                    id === 'btn_pause'
+                ) {
+
+                    await interaction.deferUpdate();
+
+                    if (!queue.paused) {
+                        await queue.pause();
+                    }
+
+                    await updateMusicPanel(
+                        guildId
+                    );
+
+                    return;
+                }
+
+                // ==================================================
+                // RESUME
+                // ==================================================
+
+                if (
+                    id === 'btn_resume'
+                ) {
+
+                    await interaction.deferUpdate();
+
+                    if (queue.paused) {
+                        await queue.resume();
+                    }
+
+                    await updateMusicPanel(
+                        guildId
+                    );
+
+                    return;
+                }
+
+                // ==================================================
+                // SKIP
+                // ==================================================
+
+                if (
+                    id === 'btn_skip'
+                ) {
+
+                    await interaction.deferUpdate();
+
+                    try {
+                        await queue.skip();
+                    } catch {}
+
+                    return;
+                }
+
+                // ==================================================
+                // LOOP
+                // ==================================================
+
+                if (
+                    id === 'btn_loop'
+                ) {
+
+                    await interaction.deferUpdate();
+
+                    try {
+
+                        queue.setRepeatMode();
+
+                        await updateMusicPanel(
+                            guildId
+                        );
+
+                    } catch {}
+
+                    return;
+                }
+
+                // ==================================================
+                // SHUFFLE
+                // ==================================================
+
+                if (
+                    id === 'btn_shuffle'
+                ) {
+
+                    await interaction.deferUpdate();
+
+                    try {
+
+                        await queue.shuffle();
+
+                        await updateMusicPanel(
+                            guildId
+                        );
+
+                    } catch {}
+
+                    return;
+                }
+
+                // ==================================================
+                // QUEUE
+                // ==================================================
+
+                if (
+                    id === 'btn_queue'
+                ) {
+
+                    const list =
+                        queue.songs
+                            .slice(0, 20)
+                            .map(
+                                (song, i) =>
+                                    `**${i + 1}.** 🎵 ${song.name}\n` +
+                                    `└ ⏱️ \`${song.formattedDuration || formatTime(song.duration)}\``
+                            )
+                            .join('\n\n');
+
+                    return interaction.reply({
+                        embeds: [
+                            redEmbed()
+                                .setAuthor({
+                                    name:
+                                        '𝐑𝐄𝐃 𝐌𝐔𝐒𝐈𝐂 • QUEUE'
+                                })
+                                .setTitle(
+                                    '📋 قائمة التشغيل'
+                                )
+                                .setDescription(
+                                    list ||
+                                    'القائمة فارغة.'
+                                )
+                                .setFooter({
+                                    text:
+                                        `${queue.songs.length} Songs`
+                                })
+                        ],
+                        ephemeral: true
+                    });
+                }
+
+                // ==================================================
+                // STOP
+                // ==================================================
+
+                if (
+                    id === 'btn_stop'
+                ) {
+
+                    await interaction.deferUpdate();
+
+                    try {
+                        await queue.stop();
+                    } catch {}
+
+                    await deleteMusicPanel(
+                        guildId
+                    );
+
+                    await sendStopMessage(
+                        guildId
+                    );
+
+                    return;
+                }
+
+                // ==================================================
+                // VOLUME
+                // ==================================================
+
+                if (
+                    id === 'btn_voldown' ||
+                    id === 'btn_volup'
+                ) {
+
+                    await interaction.deferUpdate();
+
+                    const current =
+                        Number(
+                            queue.volume
+                        ) || 100;
+
+                    const volume =
+                        id === 'btn_voldown'
+                            ? Math.max(
+                                0,
+                                current - 10
+                            )
+                            : Math.min(
+                                100,
+                                current + 10
+                            );
+
+                    queue.setVolume(
+                        volume
+                    );
+
+                    await updateMusicPanel(
+                        guildId
+                    );
+
+                    return;
+                }
+            }
+
+        } catch (error) {
+
+            console.error(
+                '❌ INTERACTION ERROR:',
+                error
+            );
+
+            try {
+
+                if (
+                    interaction.isRepliable() &&
+                    !interaction.replied &&
+                    !interaction.deferred
+                ) {
+
+                    await interaction.reply({
+                        content:
+                            '❌ حدث خطأ غير متوقع، حاول مرة أخرى.',
+                        ephemeral: true
+                    });
+
+                } else if (
+                    interaction.isRepliable() &&
+                    interaction.deferred
+                ) {
+
+                    await interaction.editReply({
+                        content:
+                            '❌ حدث خطأ غير متوقع، حاول مرة أخرى.'
                     }).catch(() => {});
                 }
-                return;
-            }
 
-            if (
-                id === 'btn_back10' ||
-                id === 'btn_forward10' ||
-                id === 'btn_back30' ||
-                id === 'btn_forward30'
-            ) {
-                await interaction.deferUpdate();
-
-                const current =
-                    Number(queue.currentTime) || 0;
-
-                const duration =
-                    Number(queue.songs[0]?.duration) || 0;
-
-                const amount =
-                    id === 'btn_back10'
-                        ? -10
-                        : id === 'btn_forward10'
-                            ? 10
-                            : id === 'btn_back30'
-                                ? -30
-                                : 30;
-
-                await queue.seek(
-                    Math.max(
-                        0,
-                        Math.min(
-                            duration || Infinity,
-                            current + amount
-                        )
-                    )
-                );
-
-                await updateMusicPanel(guildId);
-                return;
-            }
-
-            if (id === 'btn_pause') {
-                await interaction.deferUpdate();
-
-                if (!queue.paused) {
-                    await queue.pause();
-                }
-
-                await updateMusicPanel(guildId);
-                return;
-            }
-
-            if (id === 'btn_resume') {
-                await interaction.deferUpdate();
-
-                if (queue.paused) {
-                    await queue.resume();
-                }
-
-                await updateMusicPanel(guildId);
-                return;
-            }
-
-            if (id === 'btn_skip') {
-                await interaction.deferUpdate();
-
-                try {
-                    await queue.skip();
-                } catch {}
-
-                return;
-            }
-
-            if (id === 'btn_loop') {
-                await interaction.deferUpdate();
-
-                try {
-                    queue.setRepeatMode();
-                    await updateMusicPanel(guildId);
-                } catch {}
-
-                return;
-            }
-
-            if (id === 'btn_shuffle') {
-                await interaction.deferUpdate();
-
-                try {
-                    await queue.shuffle();
-                    await updateMusicPanel(guildId);
-                } catch {}
-
-                return;
-            }
-
-            if (id === 'btn_queue') {
-                const list = queue.songs
-                    .slice(0, 20)
-                    .map(
-                        (song, i) =>
-                            `**${i + 1}.** 🎵 ${song.name}\n` +
-                            `└ ⏱️ \`${song.formattedDuration || formatTime(song.duration)}\``
-                    )
-                    .join('\n\n');
-
-                return interaction.reply({
-                    embeds: [
-                        redEmbed()
-                            .setAuthor({
-                                name:
-                                    '𝐑𝐄𝐃 𝐌𝐔𝐒𝐈𝐂 • QUEUE'
-                            })
-                            .setTitle('📋 قائمة التشغيل')
-                            .setDescription(
-                                list || 'القائمة فارغة.'
-                            )
-                            .setFooter({
-                                text:
-                                    `${queue.songs.length} Songs`
-                            })
-                    ],
-                    ephemeral: true
-                });
-            }
-
-            if (id === 'btn_stop') {
-                await interaction.deferUpdate();
-
-                try {
-                    await queue.stop();
-                } catch {}
-
-                await deleteMusicPanel(guildId);
-                await sendStopMessage(guildId);
-                return;
-            }
-
-            if (
-                id === 'btn_voldown' ||
-                id === 'btn_volup'
-            ) {
-                await interaction.deferUpdate();
-
-                const current =
-                    Number(queue.volume) || 100;
-
-                const volume =
-                    id === 'btn_voldown'
-                        ? Math.max(0, current - 10)
-                        : Math.min(100, current + 10);
-
-                queue.setVolume(volume);
-                await updateMusicPanel(guildId);
-                return;
-            }
+            } catch {}
         }
-
-    } catch (error) {
-        console.error('❌ INTERACTION ERROR:', error);
-
-        try {
-            if (
-                interaction.isRepliable() &&
-                !interaction.replied &&
-                !interaction.deferred
-            ) {
-                await interaction.reply({
-                    content:
-                        '❌ حدث خطأ غير متوقع، حاول مرة أخرى.',
-                    ephemeral: true
-                });
-            } else if (
-                interaction.isRepliable() &&
-                interaction.deferred
-            ) {
-                await interaction.editReply({
-                    content:
-                        '❌ حدث خطأ غير متوقع، حاول مرة أخرى.'
-                }).catch(() => {});
-            }
-        } catch {}
     }
-});
-
+);
 
 // ======================================================
 // VOICE STATE
@@ -2725,61 +3689,90 @@ client.on('interactionCreate', async interaction => {
 
 client.on(
     'voiceStateUpdate',
-    async (oldState, newState) => {
+    async (
+        oldState,
+        newState
+    ) => {
+
         try {
+
             const guild =
                 newState.guild ||
                 oldState.guild;
 
             if (!guild) return;
 
-            const guildId = guild.id;
+            const guildId =
+                guild.id;
 
+            // ==================================================
             // BOT VOICE
+            // ==================================================
+
             if (
                 oldState.member?.id === client.user.id ||
                 newState.member?.id === client.user.id
             ) {
+
                 if (
                     oldState.channelId &&
                     !newState.channelId
                 ) {
+
                     console.log(
                         `🚪 BOT LEFT VOICE: ${guildId}`
                     );
 
-                    clearEmptyTimer(guildId);
+                    clearEmptyTimer(
+                        guildId
+                    );
 
                     if (
-                        mode247.get(guildId) &&
+                        mode247.get(guildId) === true &&
                         !manualLeave.has(guildId)
                     ) {
+
                         const oldChannel =
                             oldState.channel;
 
                         if (oldChannel) {
-                            setTimeout(async () => {
-                                try {
-                                    if (
-                                        mode247.get(guildId) &&
-                                        !manualLeave.has(guildId) &&
-                                        !getBotVoiceChannel(guild)
-                                    ) {
-                                        await distube.voices.join(
-                                            oldChannel
-                                        );
 
-                                        console.log(
-                                            `🔄 24/7 REJOIN SUCCESS: ${guildId}`
+                            setTimeout(
+                                async () => {
+
+                                    try {
+
+                                        if (
+                                            mode247.get(guildId) === true &&
+                                            !manualLeave.has(guildId) &&
+                                            !getBotVoiceChannel(guild)
+                                        ) {
+
+                                            await distube.voices.join(
+                                                oldChannel
+                                            );
+
+                                            setSavedVoiceChannel(
+                                                guildId,
+                                                oldChannel
+                                            );
+
+                                            console.log(
+                                                `🔄 24/7 REJOIN SUCCESS: ${guildId}`
+                                            );
+                                        }
+
+                                    } catch (error) {
+
+                                        console.error(
+                                            `❌ 24/7 REJOIN ERROR ${guildId}:`,
+                                            error?.message || error
                                         );
                                     }
-                                } catch (error) {
-                                    console.error(
-                                        `❌ 24/7 REJOIN ERROR ${guildId}:`,
-                                        error.message
-                                    );
-                                }
-                            }, 3000);
+
+                                },
+                                3000
+                            );
                         }
                     }
                 }
@@ -2787,55 +3780,107 @@ client.on(
                 return;
             }
 
+            // ==================================================
             // USERS
+            // ==================================================
+
             const botChannel =
-                getBotVoiceChannel(guild);
+                getBotVoiceChannel(
+                    guild
+                );
 
-            if (!botChannel) return;
-
-            if (mode247.get(guildId)) {
-                clearEmptyTimer(guildId);
+            if (!botChannel) {
                 return;
             }
 
+            // 24/7
+            if (
+                mode247.get(guildId) === true
+            ) {
+
+                clearEmptyTimer(
+                    guildId
+                );
+
+                return;
+            }
+
+            // ==================================================
             // USER JOINED BOT CHANNEL
+            // ==================================================
+
             if (
                 newState.channelId === botChannel.id &&
                 newState.member &&
                 !newState.member.user.bot
             ) {
-                clearEmptyTimer(guildId);
+
+                clearEmptyTimer(
+                    guildId
+                );
+
                 return;
             }
 
+            // ==================================================
             // USER LEFT BOT CHANNEL
+            // ==================================================
+
             if (
                 oldState.channelId === botChannel.id &&
                 newState.channelId !== botChannel.id &&
                 !newState.member?.user.bot
             ) {
-                if (hasHumanMembers(botChannel)) {
-                    clearEmptyTimer(guildId);
+
+                if (
+                    hasHumanMembers(
+                        botChannel
+                    )
+                ) {
+
+                    clearEmptyTimer(
+                        guildId
+                    );
+
                 } else {
-                    startEmptyTimer(guild);
+
+                    startEmptyTimer(
+                        guild
+                    );
                 }
 
                 return;
             }
 
+            // ==================================================
             // OTHER VOICE CHANGES
+            // ==================================================
+
             if (
                 oldState.channelId === botChannel.id ||
                 newState.channelId === botChannel.id
             ) {
-                if (hasHumanMembers(botChannel)) {
-                    clearEmptyTimer(guildId);
+
+                if (
+                    hasHumanMembers(
+                        botChannel
+                    )
+                ) {
+
+                    clearEmptyTimer(
+                        guildId
+                    );
+
                 } else {
-                    startEmptyTimer(guild);
+
+                    startEmptyTimer(
+                        guild
+                    );
                 }
             }
 
         } catch (error) {
+
             console.error(
                 '❌ VOICE STATE ERROR:',
                 error
@@ -2848,47 +3893,70 @@ client.on(
 // ERROR HANDLING
 // ======================================================
 
-client.on('error', error => {
-    console.error(
-        '❌ DISCORD CLIENT ERROR:',
-        error
-    );
-});
+client.on(
+    'error',
+    error => {
 
-client.on('warn', warning => {
-    console.warn(
-        '⚠️ DISCORD WARNING:',
-        warning
-    );
-});
+        console.error(
+            '❌ DISCORD CLIENT ERROR:',
+            error
+        );
+    }
+);
 
-process.on('unhandledRejection', error => {
-    console.error(
-        '❌ UNHANDLED REJECTION:',
-        error
-    );
-});
+client.on(
+    'warn',
+    warning => {
 
-process.on('uncaughtException', error => {
-    console.error(
-        '❌ UNCAUGHT EXCEPTION:',
-        error
-    );
-});
+        console.warn(
+            '⚠️ DISCORD WARNING:',
+            warning
+        );
+    }
+);
 
+process.on(
+    'unhandledRejection',
+    error => {
+
+        console.error(
+            '❌ UNHANDLED REJECTION:',
+            error
+        );
+    }
+);
+
+process.on(
+    'uncaughtException',
+    error => {
+
+        console.error(
+            '❌ UNCAUGHT EXCEPTION:',
+            error
+        );
+    }
+);
 
 // ======================================================
 // LOGIN
 // ======================================================
 
-client.login(TOKEN)
+client.login(
+    TOKEN
+)
     .then(() => {
-        console.log('🔐 LOGIN REQUEST SENT');
+
+        console.log(
+            '🔐 LOGIN REQUEST SENT'
+        );
+
     })
     .catch(error => {
+
         console.error(
             '❌ LOGIN FAILED:',
             error
         );
+
         process.exit(1);
     });
