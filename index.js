@@ -66,16 +66,6 @@ console.log('✅ SoundCloud Plugin loaded successfully');
 console.log('✅ YouTube Yt-Dlp Plugin loaded successfully');
 
 // ======================================================
-// DATA
-// ======================================================
-
-const mode247 = new Map();
-const musicPanels = new Map();
-const savedPlaylists = new Map();
-const musicChannels = new Map();
-const manualLeave = new Set();
-
-// ======================================================
 // PACKAGE VERSIONS
 // ======================================================
 
@@ -122,6 +112,18 @@ try {
         error.message
     );
 }
+
+
+// ======================================================
+// DATA
+// ======================================================
+
+const mode247 = new Map();
+const musicPanels = new Map();
+const savedPlaylists = new Map();
+const musicChannels = new Map();
+const manualLeave = new Set();
+
 
 // ======================================================
 // HELPERS
