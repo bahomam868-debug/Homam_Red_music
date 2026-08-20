@@ -30,7 +30,7 @@ const {
 const { DisTube } = require('distube');
 const { SoundCloudPlugin } = require('@distube/soundcloud');
 const { YouTubePlugin } = require('@distube/youtube');
-
+const { YtDlpPlugin } = require('@distube/yt-dlp');
 
 // ======================================================
 // CLIENT
@@ -52,10 +52,10 @@ const client = new Client({
 
 const distube = new DisTube(client, {
     plugins: [
+        new YtDlpPlugin({ update: true }),
         new YouTubePlugin(),
         new SoundCloudPlugin()
-    ],
-
+    ]
 });
 
 console.log('🔴 RED MUSIC');
