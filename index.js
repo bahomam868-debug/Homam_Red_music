@@ -57,8 +57,7 @@ const distube = new DisTube(client, {
     ],
 
     // مهم جداً حتى لا يخرج البوت عند انتهاء الأغنية
-    leaveOnFinish: false,
-
+    
     // لا يخرج تلقائياً بسبب فراغ الروم
     // سنعالج هذا بأنفسنا حسب وضع 24/7
     leaveOnEmpty: false,
