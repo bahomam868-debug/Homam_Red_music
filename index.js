@@ -1193,10 +1193,8 @@ client.on('messageCreate', async message => {
 
             try {
                 await distube.voices.join(voiceChannel);
-                await sendJoinMessage(message.channel);
-
-                return message.reply(
-                    '✅ تم دخول الروم الصوتي.'
+                await sendJoinMessage(interaction.channel)
+                
                 );
             } catch (error) {
                 console.error('❌ JOIN:', error);
@@ -1221,9 +1219,6 @@ client.on('messageCreate', async message => {
                 5000
             );
 
-            return message.reply(
-                '👋 تم إخراج RED MUSIC من الروم.'
-            );
         }
 
         if (command === 'stop') {
@@ -1776,10 +1771,6 @@ client.on('interactionCreate', async interaction => {
                     await distube.voices.join(voiceChannel);
                     await sendJoinMessage(interaction.channel);
 
-                    return interaction.reply({
-                        content:
-                            '✅ تم دخول الروم الصوتي.',
-                        ephemeral: true
                     });
                 } catch {
                     return interaction.reply({
@@ -1802,11 +1793,6 @@ client.on('interactionCreate', async interaction => {
                     5000
                 );
 
-                return interaction.reply({
-                    content:
-                        '👋 تم إخراج RED MUSIC من الروم.',
-                    ephemeral: true
-                });
             }
 
             if (command === 'stop') {
