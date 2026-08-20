@@ -1238,30 +1238,10 @@ distube.on(
 // ERROR
 // ======================================================
 
-distube.on(
-    'error',
-    (channel, error) => {
+distube.on('error', (error, queue) => {
+    console.error('❌ Distube Error:', error);
+});
 
-        console.error(
-            '❌ DisTube Error:',
-            error
-        );
-
-        if (channel) {
-
-            channel.send({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor('#FF0000')
-                        .setDescription(
-                            `❌ **حدث خطأ أثناء تشغيل الأغنية.**\n\n` +
-                            `\`${error?.message || 'Unknown error'}\``
-                        )
-                ]
-            }).catch(() => {});
-        }
-    }
-);
 
 
 // ======================================================
