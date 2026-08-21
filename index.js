@@ -4,7 +4,7 @@
 const http = require('http');
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('RED MUSIC is running!\n');
+    res.end('RED & LUNA MUSIC is running fast!\n');
 }).listen(process.env.PORT || 10000);
 
 const {
@@ -99,21 +99,24 @@ function getGuildData(guildId) {
 loadData();
 
 // ======================================================
-// DISTUBE SETUP
+// DISTUBE SETUP (مُحدث لدعم وتشغيل كافة الروابط والسرعة)
 // ======================================================
 
 const distube = new DisTube(client, {
     emitNewSongOnly: false,
     savePreviousSongs: true,
     joinNewVoiceChannel: false,
+    // تفعيل التحديث التلقائي لـ yt-dlp لضمان عدم توقف الروابط أبداً
     plugins: [
         new SoundCloudPlugin(),
         new YtDlpPlugin({
-            update: false,
+            update: true,
             args: [
-                "--extractor-args", "youtube:player_client=default,android,tv",
+                "--extractor-args", "youtube:player_client=default,android,tv,web",
                 "--no-check-certificates",
-                "--geo-bypass"
+                "--geo-bypass",
+                "--prefer-free-formats",
+                "--youtube-skip-dash-manifest"
             ]
         })
     ]
@@ -128,7 +131,7 @@ const controlMessages = new Map();
 const textChannels = new Map();
 
 // ======================================================
-// HELPERS
+// HELPERS & ELEGANT EMBEDS
 // ======================================================
 
 function getQueue(guildId) {
@@ -162,21 +165,29 @@ function clearLeaveTimer(guildId) {
 }
 
 function voiceError(member) {
-    if (!member.voice?.channel) return "❌ يجب عليك انتحال روم صوتي أولاً.";
+    if (!member.voice?.channel) return "يجب عليك الدخول إلى روم صوتي أولاً لاستخدام هذا الأمر.";
     const botChannel = getBotVoiceChannel(member.guild);
     if (botChannel && botChannel.id !== member.voice.channel.id) {
-        return "❌ يجب أن تكون في نفس الروم الصوتي مع البوت.";
+        return "يجب أن تكون في نفس الروم الصوتي مع البوت لتتمكن من التحكم به.";
     }
     return null;
 }
 
-function send(channel, content) {
+function sendElegant(channel, title, description, color = RED) {
     if (!channel?.isTextBased()) return;
-    return channel.send(content).catch(() => {});
+    const embed = new EmbedBuilder()
+        .setColor(color)
+        .setAuthor({ name: "R E D   M U SＩＣ  •  L U N A", iconURL: client.user.displayAvatarURL() })
+        .setTitle(title)
+        .setDescription(description)
+        .setTimestamp()
+        .setFooter({ text: "Super Fast Audio Engine", iconURL: client.user.displayAvatarURL() });
+    
+    return channel.send({ embeds: [embed] }).catch(() => {});
 }
 
 // ======================================================
-// AUTO LEAVE
+// AUTO LEAVE SYSTEM
 // ======================================================
 
 function scheduleLeave(guild) {
@@ -199,7 +210,7 @@ function scheduleLeave(guild) {
             if (channelId) {
                 const channel = await guild.channels.fetch(channelId).catch(() => null);
                 if (channel?.isTextBased()) {
-                    await channel.send("👋 خرجت من الروم الصوتي لعدم وجود نشاط.").catch(() => {});
+                    sendElegant(channel, "👋 مغادرة الروم الصوتي", "تم مغادرة الروم الصوتي لعدم وجود أي نشاط موسيقي حالياً.");
                 }
             }
         } catch (error) {}
@@ -219,8 +230,8 @@ function createPanel(queue, song) {
 
     const embed = new EmbedBuilder()
         .setColor(RED)
-        .setAuthor({ name: "🎵  R E D   M U S I C   P L A Y E R", iconURL: client.user.displayAvatarURL() })
-        .setTitle(`🎶  ${song.name || "Unknown Track"}`)
+        .setAuthor({ name: "🎶  L U N A   M U S I C   P L A Y E R", iconURL: client.user.displayAvatarURL() })
+        .setTitle(`🎵  ${song.name || "Unknown Track"}`)
         .setDescription(
             [
                 `\`${progressBar(current, duration)}\``,
@@ -231,7 +242,7 @@ function createPanel(queue, song) {
                 `🔁 **Loop Status:** \`${queue.repeatMode === 0 ? "OFF" : queue.repeatMode === 1 ? "SONG" : "QUEUE"}\``
             ].join("\n")
         )
-        .setFooter({ text: "Red Music • High Quality Audio Experience", iconURL: client.user.displayAvatarURL() })
+        .setFooter({ text: "Powered by Luna System • High Speed Engine", iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
 
     if (song.thumbnail) embed.setImage(song.thumbnail);
@@ -275,18 +286,18 @@ async function updatePanel(guildId) {
 // ======================================================
 
 function queueText(queue) {
-    if (!queue || !queue.songs?.length) return "📭 قائمة التشغيل فارغة حالياً.";
+    if (!queue || !queue.songs?.length) return "📭 قائمة الانتظار فارغة حالياً.";
     return queue.songs
         .slice(0, 15)
         .map((song, index) => {
-            if (index === 0) return `▶️ **[Now Playing]** ${song.name} \`(${song.formattedDuration || "Live"})\``;
+            if (index === 0) return `▶️ **[Playing Now]** ${song.name} \`(${song.formattedDuration || "Live"})\``;
             return `\`${index}.\` ${song.name} \`(${song.formattedDuration || "Live"})\``;
         })
         .join("\n");
 }
 
 // ======================================================
-// FULL SLASH COMMANDS REGISTRATION
+// SLASH COMMANDS SETUP
 // ======================================================
 
 const commands = [
@@ -364,7 +375,7 @@ client.on("interactionCreate", async interaction => {
         const command = interaction.commandName;
         const member = interaction.member;
 
-        if (command === "ping") return interaction.reply(`🏓 Pong! **${client.ws.ping}ms**`);
+        if (command === "ping") return interaction.reply(`🏓 سرعة استجابة البوت: **${client.ws.ping}ms**`);
 
         if (command === "play") {
             const err = voiceError(member);
@@ -381,9 +392,9 @@ client.on("interactionCreate", async interaction => {
                     textChannel: interaction.channel,
                     metadata: { requestedBy: member.id }
                 });
-                await interaction.editReply(`✅ تم إضافة الأغنية للتشغيل.`);
+                await interaction.editReply(`✅ تم إضافة الأغنية وبدء التشغيل بنجاح.`);
             } catch (err) {
-                await interaction.editReply(`❌ لم أتمكن من العثور على الأغنية المطلوبة.`);
+                await interaction.editReply(`❌ عذراً، لم أتمكن من معالجة الرابط أو العثور على الأغنية.`);
             }
             return;
         }
@@ -396,45 +407,45 @@ client.on("interactionCreate", async interaction => {
             const err = voiceError(member);
             if (err) return interaction.reply({ content: err, ephemeral: true });
             const queue = getQueue(interaction.guild.id);
-            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية.", ephemeral: true });
+            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية تعمل.", ephemeral: true });
             await queue.pause();
             await updatePanel(interaction.guild.id);
-            return interaction.reply("⏸️ تم الإيقاف المؤقت.");
+            return interaction.reply("⏸️ تم إيقاف الموسيقى مؤقتاً.");
         }
 
         if (command === "stop") {
             const err = voiceError(member);
             if (err) return interaction.reply({ content: err, ephemeral: true });
             const queue = getQueue(interaction.guild.id);
-            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية.", ephemeral: true });
+            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية تعمل.", ephemeral: true });
             await queue.stop();
-            return interaction.reply("⏹️ تم إيقاف الموسيقى.");
+            return interaction.reply("⏹️ تم إيقاف الموسيقى ومسح القائمة.");
         }
 
         if (command === "resume") {
             const err = voiceError(member);
             if (err) return interaction.reply({ content: err, ephemeral: true });
             const queue = getQueue(interaction.guild.id);
-            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية.", ephemeral: true });
+            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية تعمل.", ephemeral: true });
             await queue.resume();
             await updatePanel(interaction.guild.id);
-            return interaction.reply("▶️ تم الاستئناف.");
+            return interaction.reply("▶️ تم استئناف تشغيل الموسيقى.");
         }
 
         if (command === "skip") {
             const err = voiceError(member);
             if (err) return interaction.reply({ content: err, ephemeral: true });
             const queue = getQueue(interaction.guild.id);
-            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية.", ephemeral: true });
+            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية تعمل.", ephemeral: true });
             await queue.skip();
-            return interaction.reply("⏭️ تم تخطي الأغنية.");
+            return interaction.reply("⏭️ تم تخطي الأغنية الحالية.");
         }
 
         if (command === "seek") {
             const err = voiceError(member);
             if (err) return interaction.reply({ content: err, ephemeral: true });
             const queue = getQueue(interaction.guild.id);
-            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية.", ephemeral: true });
+            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية تعمل.", ephemeral: true });
             const seconds = interaction.options.getInteger("seconds");
             await queue.seek(seconds);
             return interaction.reply(`⏩ تم الانتقال إلى الثانية: **${seconds}**`);
@@ -445,17 +456,17 @@ client.on("interactionCreate", async interaction => {
             clearLeaveTimer(interaction.guild.id);
             textChannels.set(interaction.guild.id, interaction.channel.id);
             await distube.voices.join(member.voice.channel);
-            return interaction.reply(`🔊 دخلت إلى روم: **${member.voice.channel.name}**`);
+            return interaction.reply(`🔊 انضممت إلى روم الصوت: **${member.voice.channel.name}**`);
         }
 
         if (command === "leave") {
             const err = voiceError(member);
             if (err) return interaction.reply({ content: err, ephemeral: true });
             const guildData = getGuildData(interaction.guild.id);
-            if (guildData.mode247) return interaction.reply("🔴 وضع 24/7 مفعل، لا يمكنني الخروج.");
+            if (guildData.mode247) return interaction.reply("🔴 وضع 24/7 مفعل حالياً، لا يمكنني مغادرة الروم.");
             clearLeaveTimer(interaction.guild.id);
             await distube.voices.leave(interaction.guild.id);
-            return interaction.reply("👋 خرجت من الروم الصوتي.");
+            return interaction.reply("👋 تم الخروج من الروم الصوتي بنجاح.");
         }
 
         if (command === "247") {
@@ -466,16 +477,16 @@ client.on("interactionCreate", async interaction => {
             saveData();
             if (guildData.mode247) {
                 clearLeaveTimer(interaction.guild.id);
-                return interaction.reply("🔴 **تم تفعيل وضع 24/7 بنجاح.**");
+                return interaction.reply("🔴 **تم تفعيل وضع التواجد الدائم (24/7) بنجاح.**");
             }
-            return interaction.reply("⚫ **تم إيقاف وضع 24/7.**");
+            return interaction.reply("⚫ **تم إيقاف وضع التواجد الدائم (24/7).**");
         }
 
     } catch (e) {}
 });
 
 // ======================================================
-// PREFIX COMMANDS & COMPLETE SHORTCUTS
+// PREFIX COMMANDS & LUNA COMPLETE SYSTEM (5list, 5p, etc.)
 // ======================================================
 
 client.on("messageCreate", async message => {
@@ -491,187 +502,187 @@ client.on("messageCreate", async message => {
         if (command === "5command") {
             const embed = new EmbedBuilder()
                 .setColor(RED)
-                .setTitle("📜  R E D   M U S I C   C O M M A N D S")
+                .setAuthor({ name: "LUNA & RED MUSIC COMMANDS", iconURL: client.user.displayAvatarURL() })
+                .setTitle("📜 قائمة الأوامر الشاملة الفورية")
                 .setDescription(
                     [
-                        "**🎵 MUSIC COMMANDS**",
+                        "**🎵 MUSIC & PLAY**",
                         "`/play <song>` • `5p <song>` • `5play <song>`",
                         "",
-                        "**📋 PLAYLISTS**",
-                        "`/playlist` • `/lista` • `5queue`",
-                        "`5list create <name>`",
-                        "`5list add <name> <song>`",
-                        "`5list show`",
-                        "`5list play <name>`",
+                        "**📋 PLAYLIST SYSTEM (Luna Custom)**",
+                        "`5list create <name>` - إنشاء قائمة جديدة",
+                        "`5list add <name> <song>` - إضافة أغنية للقائمة",
+                        "`5list show` - عرض القوائم المحفوظة",
+                        "`5list play <name>` - تشغيل قائمة كاملة",
                         "",
-                        "**🎧 CONTROL & SEEK**",
-                        "`/stop` • `/pause` • `/resume` • `/skip`",
-                        "`/seek <seconds>` • `5stop` • `5pause` • `5resume` • `5skip`",
+                        "**🎧 CONTROL & QUEUE**",
+                        "`/playlist` • `/lista` • `5queue`",
+                        "`/stop` • `/pause` • `/resume` • `/skip` • `/seek`",
+                        "`5stop` • `5pause` • `5resume` • `5skip` • `5remove <number>`",
                         "",
                         "**🔊 VOICE & SYSTEM**",
                         "`/join` • `/leave` • `/247` • `/ping`",
-                        "`5join` • `5leave` • `5247` • `5ping`",
-                        "",
-                        "**🗑️ MANAGEMENT**",
-                        "`5remove <number>`"
+                        "`5join` • `5leave` • `5247` • `5ping`"
                     ].join("\n")
                 )
-                .setFooter({ text: "Use prefixes or slash commands seamlessly!" });
-            return send(message.channel, { embeds: [embed] });
+                .setFooter({ text: "Super Fast Engine Integration" });
+            return message.channel.send({ embeds: [embed] });
         }
 
-        // التشغيل السريع 5p / 5play
+        // التشغيل الفوري والسريع 5p / 5play
         if (command === "5p" || command === "5play") {
             const query = args.join(" ");
-            if (!query) return send(message.channel, "❌ يرجى كتابة اسم الأغنية أو الرابط.");
+            if (!query) return sendElegant(message.channel, "❌ تنبيه بالطلب", "يرجى كتابة اسم الأغنية أو الرابط المطلوب بجانب الأمر.");
 
             const err = voiceError(member);
-            if (err) return send(message.channel, err);
+            if (err) return sendElegant(message.channel, "❌ خطأ في الصوتي", err);
 
             try {
                 clearLeaveTimer(message.guild.id);
                 textChannels.set(message.guild.id, message.channel.id);
+                // تشغيل فوري مباشر بدون انتظار بحث
                 await distube.play(member.voice.channel, query, {
                     member,
                     textChannel: message.channel,
                     metadata: { requestedBy: member.id }
                 });
-                await send(message.channel, `✅ تم إضافة الأغنية للتشغيل.`);
+                await sendElegant(message.channel, "🎵 تم التشغيل", `✅ جاري تشغيل طلبك فوراً.`);
             } catch (err) {
-                await send(message.channel, `❌ عذراً، لم أتمكن من العثور على الأغنية.`);
+                await sendElegant(message.channel, "❌ خطأ في التشغيل", "عذراً، لم أتمكن من معالجة هذا الرابط أو العثور على الأغنية.");
             }
             return;
         }
 
         if (command === "5stop") {
             const err = voiceError(member);
-            if (err) return send(message.channel, err);
+            if (err) return sendElegant(message.channel, "❌ خطأ", err);
             const queue = getQueue(message.guild.id);
-            if (!queue) return send(message.channel, "❌ لا توجد أغنية تعمل.");
+            if (!queue) return sendElegant(message.channel, "❌ تنبيه", "لا توجد أي أغنية تعمل حالياً.");
             await queue.stop();
-            return send(message.channel, "⏹️ تم إيقاف الموسيقى.");
+            return sendElegant(message.channel, "⏹️ إيقاف الموسيقى", "تم إيقاف الموسيقى ومسح قائمة الانتظار.");
         }
 
         if (command === "5pause") {
             const err = voiceError(member);
-            if (err) return send(message.channel, err);
+            if (err) return sendElegant(message.channel, "❌ خطأ", err);
             const queue = getQueue(message.guild.id);
-            if (!queue) return send(message.channel, "❌ لا توجد أغنية.");
+            if (!queue) return sendElegant(message.channel, "❌ تنبيه", "لا توجد أغنية تعمل لإيقافها.");
             await queue.pause();
             await updatePanel(message.guild.id);
-            return send(message.channel, "⏸️ تم الإيقاف المؤقت.");
+            return sendElegant(message.channel, "⏸️ إيقاف مؤقت", "تم إيقاف التشغيل مؤقتاً.");
         }
 
         if (command === "5resume") {
             const err = voiceError(member);
-            if (err) return send(message.channel, err);
+            if (err) return sendElegant(message.channel, "❌ خطأ", err);
             const queue = getQueue(message.guild.id);
-            if (!queue) return send(message.channel, "❌ لا توجد أغنية.");
+            if (!queue) return sendElegant(message.channel, "❌ تنبيه", "لا توجد أغنية متوقفة حالياً.");
             await queue.resume();
             await updatePanel(message.guild.id);
-            return send(message.channel, "▶️ تم الاستئناف.");
+            return sendElegant(message.channel, "▶️ استئناف التشغيل", "تم استئناف تشغيل الموسيقى.");
         }
 
         if (command === "5skip") {
             const err = voiceError(member);
-            if (err) return send(message.channel, err);
+            if (err) return sendElegant(message.channel, "❌ خطأ", err);
             const queue = getQueue(message.guild.id);
-            if (!queue) return send(message.channel, "❌ لا توجد أغنية.");
+            if (!queue) return sendElegant(message.channel, "❌ تنبيه", "لا توجد أغنية لتخطيها.");
             await queue.skip();
-            return send(message.channel, "⏭️ تم تخطي الأغنية.");
+            return sendElegant(message.channel, "⏭️ تخطي الأغنية", "تم تخطي الأغنية الحالية بنجاح.");
         }
 
         if (command === "5join") {
-            if (!member.voice?.channel) return send(message.channel, "❌ يجب عليك دخول روم صوتي أولاً.");
+            if (!member.voice?.channel) return sendElegant(message.channel, "❌ خطأ", "يجب عليك دخول روم صوتي أولاً.");
             clearLeaveTimer(message.guild.id);
             textChannels.set(message.guild.id, message.channel.id);
             await distube.voices.join(member.voice.channel);
-            return send(message.channel, `🔊 دخلت إلى روم: **${member.voice.channel.name}**`);
+            return sendElegant(message.channel, "🔊 انضمام للروم", `تم الانضمام بنجاح إلى روم: **${member.voice.channel.name}**`);
         }
 
         if (command === "5leave") {
             const err = voiceError(member);
-            if (err) return send(message.channel, err);
+            if (err) return sendElegant(message.channel, "❌ خطأ", err);
             const guildData = getGuildData(message.guild.id);
-            if (guildData.mode247) return send(message.channel, "🔴 وضع 24/7 مفعل، لا يمكنني الخروج.");
+            if (guildData.mode247) return sendElegant(message.channel, "🔴 وضع 24/7", "وضع 24/7 مفعل، لا يمكنني الخروج الآن.");
             clearLeaveTimer(message.guild.id);
             await distube.voices.leave(message.guild.id);
-            return send(message.channel, "👋 خرجت من الروم الصوتي.");
+            return sendElegant(message.channel, "👋 مغادرة الروم", "تم الخروج من الروم الصوتي بنجاح.");
         }
 
         if (command === "5247") {
             const err = voiceError(member);
-            if (err) return send(message.channel, err);
+            if (err) return sendElegant(message.channel, "❌ خطأ", err);
             const guildData = getGuildData(message.guild.id);
             guildData.mode247 = !guildData.mode247;
             saveData();
             if (guildData.mode247) {
                 clearLeaveTimer(message.guild.id);
-                return send(message.channel, "🔴 **تم تفعيل وضع 24/7 بنجاح.**");
+                return sendElegant(message.channel, "🔴 نظام 24/7", "تم تفعيل وضع التواجد الدائم بنجاح.");
             }
-            return send(message.channel, "⚫ **تم إيقاف وضع 24/7.**");
+            return sendElegant(message.channel, "⚫ نظام 24/7", "تم إيقاف وضع التواجد الدائم.");
         }
 
         if (command === "5ping") {
-            return send(message.channel, `🏓 Pong! **${client.ws.ping}ms**`);
+            return sendElegant(message.channel, "🏓 سرعة البوت", `سرعة استجابة السيرفر الحالية: **${client.ws.ping}ms**`);
         }
 
         if (command === "5queue") {
-            return send(message.channel, queueText(getQueue(message.guild.id)));
+            return sendElegant(message.channel, "📋 قائمة الانتظار", queueText(getQueue(message.guild.id)));
         }
 
         if (command === "5remove") {
             const err = voiceError(member);
-            if (err) return send(message.channel, err);
+            if (err) return sendElegant(message.channel, "❌ خطأ", err);
             const queue = getQueue(message.guild.id);
-            if (!queue) return send(message.channel, "❌ لا توجد قائمة تشغيل.");
+            if (!queue) return sendElegant(message.channel, "❌ خطأ", "لا توجد قائمة تشغيل نشطة.");
             
             const index = parseInt(args[0]);
             if (!index || index <= 1 || index >= queue.songs.length) {
-                return send(message.channel, "❌ يرجى تحديد رقم صحيح لأغنية في القائمة (لا يمكن حذف الأغنية الحالية).");
+                return sendElegant(message.channel, "❌ خطأ في الرقم", "يرجى إدخال رقم صحيح لعنصر في القائمة (لا يمكن حذف الأغنية الحالية).");
             }
             
             const removed = queue.songs.splice(index, 1);
-            return send(message.channel, `🗑️ تم إزالة الأغنية: **${removed[0].name}**`);
+            return sendElegant(message.channel, "🗑️ إزالة أغنية", `تمت إزالة الأغنية بنجاح: **${removed[0].name}**`);
         }
 
-        // أوامر القوائم المخصصة (5list)
+        // أوامر قوائم التشغيل المخصصة المتقدمة (Luna Playlist System)
         if (command === "5list") {
             const sub = (args.shift() || "").toLowerCase();
             const guildData = getGuildData(message.guild.id);
 
             if (sub === "create") {
                 const name = args.join(" ").trim();
-                if (!name) return send(message.channel, "❌ الاستخدام: `5list create <اسم القائمة>`");
-                if (guildData.playlists[name]) return send(message.channel, "❌ هذه القائمة موجودة مسبقاً.");
+                if (!name) return sendElegant(message.channel, "❌ صيغة خاطئة", "الاستخدام الصحيح: `5list create <اسم القائمة>`");
+                if (guildData.playlists[name]) return sendElegant(message.channel, "❌ مكرر", "هذه القائمة موجودة مسبقاً.");
                 guildData.playlists[name] = [];
                 saveData();
-                return send(message.channel, `📋 تم إنشاء قائمة التشغيل **${name}** بنجاح.`);
+                return sendElegant(message.channel, "📋 إنشاء قائمة تشغيل", `تم إنشاء قائمة التشغيل الجديدة **${name}** بنجاح.`);
             }
 
             if (sub === "add") {
                 const name = args.shift();
                 const song = args.join(" ").trim();
-                if (!name || !song) return send(message.channel, "❌ الاستخدام: `5list add <اسم القائمة> <الرابط أو الاسم>`");
-                if (!guildData.playlists[name]) return send(message.channel, "❌ القائمة غير موجودة.");
+                if (!name || !song) return sendElegant(message.channel, "❌ صيغة خاطئة", "الاستخدام الصحيح: `5list add <اسم القائمة> <الرابط أو اسم الأغنية>`");
+                if (!guildData.playlists[name]) return sendElegant(message.channel, "❌ غير موجودة", "قائمة التشغيل هذه غير موجودة.");
                 guildData.playlists[name].push(song);
                 saveData();
-                return send(message.channel, `🎵 تمت إضافة العنصر إلى قائمة **${name}**.`);
+                return sendElegant(message.channel, "🎵 إضافة لقائمة التشغيل", `تمت إضافة العنصر بنجاح إلى قائمة **${name}**.`);
             }
 
             if (sub === "show") {
                 const names = Object.keys(guildData.playlists);
-                if (!names.length) return send(message.channel, "📭 لا توجد قوائم تشغيل محفوظة.");
-                return send(message.channel, names.map(n => `📋 **${n}** ─── \`${guildData.playlists[n].length} أغاني\``).join("\n"));
+                if (!names.length) return sendElegant(message.channel, "📭 القوائم", "لا توجد أي قوائم تشغيل محفوظة في هذا السيرفر.");
+                const listInfo = names.map(n => `📋 **${n}** ─── \`${guildData.playlists[n].length} أغاني\``).join("\n");
+                return sendElegant(message.channel, "📋 قوائم التشغيل المحفوظة", listInfo);
             }
 
             if (sub === "play") {
                 const name = args.join(" ").trim();
                 const playlist = guildData.playlists[name];
-                if (!playlist || !playlist.length) return send(message.channel, "❌ القائمة غير موجودة أو فارغة.");
+                if (!playlist || !playlist.length) return sendElegant(message.channel, "❌ خطأ", "قائمة التشغيل غير موجودة أو أنها فارغة تماماً.");
 
                 const err = voiceError(member);
-                if (err) return send(message.channel, err);
+                if (err) return sendElegant(message.channel, "❌ خطأ صوتي", err);
 
                 clearLeaveTimer(message.guild.id);
                 textChannels.set(message.guild.id, message.channel.id);
@@ -680,20 +691,20 @@ client.on("messageCreate", async message => {
                     try {
                         await distube.play(member.voice.channel, song, {
                             member,
-                            textChannel: message.channel,
+                            textChannel: message.channel,clients: ['android', 'tv', 'web'],
                             metadata: { requestedBy: member.id }
                         });
                     } catch (e) {}
                 }
-                return send(message.channel, `📋 جاري تشغيل قائمة التشغيل: **${name}**`);
+                return sendElegant(message.channel, "🎶 تشغيل قائمة التشغيل", `جاري الآن إضافة وتجهيز تشغيل القائمة بالكامل: **${name}**`);
             }
 
-            return send(message.channel, [
-                "**📋 أوامر قوائم التشغيل المتاحة:**",
+            return sendElegant(message.channel, "📋 نظام قوائم التشغيل (Luna)", [
+                "الأوامر المتاحة للإدارة:",
                 "`5list create <name>` - إنشـاء قائمة جديدة",
                 "`5list add <name> <song>` - إضافة أغنية للقائمة",
-                "`5list show` - عرض القوائم المحفوظة",
-                "`5list play <name>` - تشغيل قائمة كاملة"
+                "`5list show` - عرض جميع القوائم المحفوظة",
+                "`5list play <name>` - تشغيل قائمة كاملة دفعة واحدة"
             ].join("\n"));
         }
 
@@ -741,7 +752,7 @@ distube.on("disconnect", queue => {
 
 distube.on("error", async (error, queue) => {
     if (queue && queue.textChannel) {
-        queue.textChannel.send("❌ حدث خطأ أثناء تشغيل هذه الأغنية.").catch(() => {});
+        sendElegant(queue.textChannel, "❌ خطأ تقني", "تعذر تشغيل هذا الرابط. تأكد من صحة الرابط أو أنه متاح للتشغيل العام.");
     }
 });
 
@@ -750,11 +761,11 @@ distube.on("error", async (error, queue) => {
 // ======================================================
 
 client.once("ready", async () => {
-    console.log(`🔴 RED MUSIC ONLINE: ${client.user.tag}`);
+    console.log(`🔴 RED & LUNA MUSIC ONLINE & FAST: ${client.user.tag}`);
     await registerCommands(client);
 
     client.user.setPresence({
-        activities: [{ name: "RED MUSIC 🎵 • 5command", type: 2 }],
+        activities: [{ name: "Super Fast Music • 5command", type: 2 }],
         status: "online"
     });
 });
