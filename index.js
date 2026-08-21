@@ -251,24 +251,9 @@ function scheduleLeave(guild) {
             }
 
             await distube.voices.leave(guild.id);
-
-            const textChannelId =
-                manualVoiceTextChannels.get(guild.id);
-
-            if (textChannelId) {
-                const channel =
-                    await guild.channels.fetch(textChannelId).catch(() => null);
-
-                if (channel?.isTextBased()) {
-                    await channel.send(
-                        "👋 خرجت من الروم الصوتي بعد 10 دقائق بدون تشغيل."
-                    ).catch(() => {});
-                }
-            }
-
             manualVoiceTextChannels.delete(guild.id);
         } catch (error) {
-            console.error("❌ Auto leave error:", error);
+            // كتم أخطاء المغادرة التلقائية بالكامل لتجنب الإزعاج
         }
     }, IDLE_LEAVE_TIME);
 
@@ -280,7 +265,7 @@ function sendSafe(channel, content) {
 
     return channel.send(content).catch(() => {});
 }
-
+ 
 // ======================================================
 // CONTROL PANEL
 // ======================================================
