@@ -57,12 +57,10 @@ const client = new Client({
 });
 
 // ======================================================
-// DATA
+// DATA (JSON DATABASE)
 // ======================================================
 
-let data = {
-    guilds: {}
-};
+let data = { guilds: {} };
 
 function loadData() {
     try {
@@ -70,10 +68,8 @@ function loadData() {
             saveData();
             return;
         }
-
         const file = fs.readFileSync(DATA_FILE, "utf8");
         if (!file.trim()) return;
-
         data = JSON.parse(file);
         if (!data.guilds) data.guilds = {};
     } catch (error) {
@@ -104,14 +100,13 @@ function getGuildData(guildId) {
 loadData();
 
 // ======================================================
-// DISTUBE
+// DISTUBE SETUP
 // ======================================================
 
 const distube = new DisTube(client, {
-    emitNewSongOnly: true,
+    emitNewSongOnly: false,
     savePreviousSongs: true,
     joinNewVoiceChannel: false,
-
     plugins: [
         new SoundCloudPlugin(),
         new YtDlpPlugin({
@@ -126,7 +121,7 @@ const distube = new DisTube(client, {
 });
 
 // ======================================================
-// RUNTIME
+// RUNTIME MAPS
 // ======================================================
 
 const leaveTimers = new Map();
@@ -195,15 +190,12 @@ function scheduleLeave(guild) {
         try {
             const currentData = getGuildData(guild.id);
             if (currentData.mode247) return;
-
             const queue = getQueue(guild.id);
             if (queue) return;
-
             const voiceChannel = getBotVoiceChannel(guild);
             if (!voiceChannel) return;
 
             await distube.voices.leave(guild.id);
-
             const channelId = textChannels.get(guild.id);
             if (channelId) {
                 const channel = await guild.channels.fetch(channelId).catch(() => null);
@@ -218,7 +210,7 @@ function scheduleLeave(guild) {
 }
 
 // ======================================================
-// CONTROL PANEL
+// CONTROL PANEL EMBED
 // ======================================================
 
 function createPanel(queue, song) {
@@ -228,7 +220,7 @@ function createPanel(queue, song) {
 
     const embed = new EmbedBuilder()
         .setColor(RED)
-        .setTitle("🔴 RED MUSIC")
+        .setTitle("🔴 RED MUSIC CONTROL PANEL")
         .setDescription(
             [
                 "🎧 **NOW PLAYING**",
@@ -286,7 +278,7 @@ async function updatePanel(guildId) {
 }
 
 // ======================================================
-// QUEUE TEXT
+// QUEUE FORMATTER
 // ======================================================
 
 function queueText(queue) {
@@ -314,7 +306,7 @@ const commands = [
     new SlashCommandBuilder().setName("join").setDescription("دخول البوت للروم"),
     new SlashCommandBuilder().setName("leave").setDescription("خروج البوت"),
     new SlashCommandBuilder().setName("ping").setDescription("سرعة البوت"),
-    new SlashCommandBuilder().setName("queue").setDescription("عرض الـQueue")
+    new SlashCommandBuilder().setName("queue").setDescription("عرض قائمة الانتظار")
 ].map(c => c.toJSON());
 
 async function registerCommands(clientInstance) {
@@ -326,7 +318,7 @@ async function registerCommands(clientInstance) {
 }
 
 // ======================================================
-// PLAY MUSIC HELPER
+// PLAY MUSIC CORE FUNCTION
 // ======================================================
 
 async function playMusic({ member, guild, textChannel, query }) {
@@ -340,6 +332,8 @@ async function playMusic({ member, guild, textChannel, query }) {
 
     clearLeaveTimer(guild.id);
     textChannels.set(guild.id, textChannel.id);
+
+    await send(textChannel, `🔎 جاري البحث عن: **${query}**...`);
 
     await distube.play(voiceChannel, query, {
         member,
@@ -411,9 +405,9 @@ client.on("interactionCreate", async interaction => {
 
             try {
                 await playMusic({ member, guild: interaction.guild, textChannel: interaction.channel, query });
-                await interaction.editReply(`🔎 جاري تشغيل: **${query}**`);
+                await interaction.editReply(`✅ تمت اضافة الأغنية بنجاح.`);
             } catch (err) {
-                await interaction.editReply(`❌ تعذر تشغيل الروم/الرابط: ${err.message}`);
+                await interaction.editReply(`❌ تعذر تشغيل الرابط أو الأغنية.`);
             }
             return;
         }
@@ -494,6 +488,7 @@ client.on("messageCreate", async message => {
 
             try {
                 await playMusic({ member, guild: message.guild, textChannel: message.channel, query });
+                await send(message.channel, `🎵 تم اضافة الأغنية للتشغيل.`);
             } catch (err) {
                 await send(message.channel, `❌ لم أتمكن من تشغيل هذا الرابط أو الأغنية.`);
             }
@@ -504,7 +499,7 @@ client.on("messageCreate", async message => {
             const err = voiceError(member);
             if (err) return send(message.channel, `❌ ${err}`);
             const queue = getQueue(message.guild.id);
-            if (!queue) return send(message.channel, "❌ لاتوجد أغنية.");
+            if (!queue) return send(message.channel, "❌ لا توجد أغنية.");
             await queue.pause();
             await updatePanel(message.guild.id);
             return send(message.channel, "⏸️ تم الإيقاف المؤقت.");
@@ -514,7 +509,7 @@ client.on("messageCreate", async message => {
             const err = voiceError(member);
             if (err) return send(message.channel, `❌ ${err}`);
             const queue = getQueue(message.guild.id);
-            if (!queue) return send(message.channel, "❌ لاتوجد أغنية.");
+            if (!queue) return send(message.channel, "❌ لا توجد أغنية.");
             await queue.resume();
             await updatePanel(message.guild.id);
             return send(message.channel, "▶️ تم الاستئناف.");
