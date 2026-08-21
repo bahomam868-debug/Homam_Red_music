@@ -4,7 +4,7 @@
 const http = require('http');
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('RED & LUNA MUSIC is running fast!\n');
+    res.end('RED MUSIC is running fast!\n');
 }).listen(process.env.PORT || 10000);
 
 const {
@@ -99,14 +99,13 @@ function getGuildData(guildId) {
 loadData();
 
 // ======================================================
-// DISTUBE SETUP (مُحدث لدعم وتشغيل كافة الروابط والسرعة)
+// DISTUBE SETUP
 // ======================================================
 
 const distube = new DisTube(client, {
     emitNewSongOnly: false,
     savePreviousSongs: true,
     joinNewVoiceChannel: false,
-    // تفعيل التحديث التلقائي لـ yt-dlp لضمان عدم توقف الروابط أبداً
     plugins: [
         new SoundCloudPlugin(),
         new YtDlpPlugin({
@@ -177,7 +176,7 @@ function sendElegant(channel, title, description, color = RED) {
     if (!channel?.isTextBased()) return;
     const embed = new EmbedBuilder()
         .setColor(color)
-        .setAuthor({ name: "R E D   M U SＩＣ  •  L U N A", iconURL: client.user.displayAvatarURL() })
+        .setAuthor({ name: "R E D   M U S I C", iconURL: client.user.displayAvatarURL() })
         .setTitle(title)
         .setDescription(description)
         .setTimestamp()
@@ -230,7 +229,7 @@ function createPanel(queue, song) {
 
     const embed = new EmbedBuilder()
         .setColor(RED)
-        .setAuthor({ name: "🎶  L U N A   M U S I C   P L A Y E R", iconURL: client.user.displayAvatarURL() })
+        .setAuthor({ name: "🎶  R E D   M U S I C   P L A Y E R", iconURL: client.user.displayAvatarURL() })
         .setTitle(`🎵  ${song.name || "Unknown Track"}`)
         .setDescription(
             [
@@ -242,7 +241,7 @@ function createPanel(queue, song) {
                 `🔁 **Loop Status:** \`${queue.repeatMode === 0 ? "OFF" : queue.repeatMode === 1 ? "SONG" : "QUEUE"}\``
             ].join("\n")
         )
-        .setFooter({ text: "Powered by Luna System • High Speed Engine", iconURL: client.user.displayAvatarURL() })
+        .setFooter({ text: "Powered by Red System • High Speed Engine", iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
 
     if (song.thumbnail) embed.setImage(song.thumbnail);
@@ -297,7 +296,7 @@ function queueText(queue) {
 }
 
 // ======================================================
-// SLASH COMMANDS SETUP
+// SLASH COMMANDS SETUP (جميع أوامر السلاش)
 // ======================================================
 
 const commands = [
@@ -319,8 +318,12 @@ async function registerCommands(clientInstance) {
     if (!clientInstance.user) return;
     const rest = new REST({ version: "10" }).setToken(TOKEN);
     try {
+        // تسجيل الأوامر على مستوى السيرفرات لضمان ظهورها الفوري، أو العالمية
         await rest.put(Routes.applicationCommands(clientInstance.user.id), { body: commands });
-    } catch (error) {}
+        console.log("✅ تم تسجيل جميع أوامر السلاش بنجاح.");
+    } catch (error) {
+        console.error("❌ خطأ في تسجيل أوامر السلاش:", error);
+    }
 }
 
 // ======================================================
@@ -387,12 +390,21 @@ client.on("interactionCreate", async interaction => {
             try {
                 clearLeaveTimer(interaction.guild.id);
                 textChannels.set(interaction.guild.id, interaction.channel.id);
+                
+                const queue = getQueue(interaction.guild.id);
+                const isPlaying = queue && queue.songs && queue.songs.length > 0;
+
                 await distube.play(member.voice.channel, query, {
                     member,
                     textChannel: interaction.channel,
                     metadata: { requestedBy: member.id }
                 });
-                await interaction.editReply(`✅ تم إضافة الأغنية وبدء التشغيل بنجاح.`);
+
+                if (isPlaying) {
+                    await interaction.editReply(`✅ تم الإضافة للتشغيل التلقائي التالي.`);
+                } else {
+                    await interaction.editReply(`✅ تم التشغيل.`);
+                }
             } catch (err) {
                 await interaction.editReply(`❌ عذراً، لم أتمكن من معالجة الرابط أو العثور على الأغنية.`);
             }
@@ -486,7 +498,7 @@ client.on("interactionCreate", async interaction => {
 });
 
 // ======================================================
-// PREFIX COMMANDS & LUNA COMPLETE SYSTEM (5list, 5p, etc.)
+// PREFIX COMMANDS SYSTEM (5p, 5play, 5list, etc.)
 // ======================================================
 
 client.on("messageCreate", async message => {
@@ -498,18 +510,17 @@ client.on("messageCreate", async message => {
         const args = parts;
         const member = message.member;
 
-        // قائمة الأوامر التوضيحية (5command)
         if (command === "5command") {
             const embed = new EmbedBuilder()
                 .setColor(RED)
-                .setAuthor({ name: "LUNA & RED MUSIC COMMANDS", iconURL: client.user.displayAvatarURL() })
+                .setAuthor({ name: "RED MUSIC COMMANDS", iconURL: client.user.displayAvatarURL() })
                 .setTitle("📜 قائمة الأوامر الشاملة الفورية")
                 .setDescription(
                     [
                         "**🎵 MUSIC & PLAY**",
                         "`/play <song>` • `5p <song>` • `5play <song>`",
                         "",
-                        "**📋 PLAYLIST SYSTEM (Luna Custom)**",
+                        "**📋 PLAYLIST SYSTEM**",
                         "`5list create <name>` - إنشاء قائمة جديدة",
                         "`5list add <name> <song>` - إضافة أغنية للقائمة",
                         "`5list show` - عرض القوائم المحفوظة",
@@ -529,7 +540,6 @@ client.on("messageCreate", async message => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // التشغيل الفوري والسريع 5p / 5play
         if (command === "5p" || command === "5play") {
             const query = args.join(" ");
             if (!query) return sendElegant(message.channel, "❌ تنبيه بالطلب", "يرجى كتابة اسم الأغنية أو الرابط المطلوب بجانب الأمر.");
@@ -540,13 +550,21 @@ client.on("messageCreate", async message => {
             try {
                 clearLeaveTimer(message.guild.id);
                 textChannels.set(message.guild.id, message.channel.id);
-                // تشغيل فوري مباشر بدون انتظار بحث
+                
+                const queue = getQueue(message.guild.id);
+                const isPlaying = queue && queue.songs && queue.songs.length > 0;
+
                 await distube.play(member.voice.channel, query, {
                     member,
                     textChannel: message.channel,
                     metadata: { requestedBy: member.id }
                 });
-                await sendElegant(message.channel, "🎵 تم التشغيل", `✅ جاري تشغيل طلبك فوراً.`);
+
+                if (isPlaying) {
+                    await sendElegant(message.channel, "🎵 تم الإضافة", "✅ تم الإضافة للتشغيل التلقائي التالي.");
+                } else {
+                    await sendElegant(message.channel, "🎵 تم التشغيل", "✅ جاري تشغيل طلبك فوراً.");
+                }
             } catch (err) {
                 await sendElegant(message.channel, "❌ خطأ في التشغيل", "عذراً، لم أتمكن من معالجة هذا الرابط أو العثور على الأغنية.");
             }
@@ -645,7 +663,6 @@ client.on("messageCreate", async message => {
             return sendElegant(message.channel, "🗑️ إزالة أغنية", `تمت إزالة الأغنية بنجاح: **${removed[0].name}**`);
         }
 
-        // أوامر قوائم التشغيل المخصصة المتقدمة (Luna Playlist System)
         if (command === "5list") {
             const sub = (args.shift() || "").toLowerCase();
             const guildData = getGuildData(message.guild.id);
@@ -691,7 +708,7 @@ client.on("messageCreate", async message => {
                     try {
                         await distube.play(member.voice.channel, song, {
                             member,
-                            textChannel: message.channel,clients: ['android', 'tv', 'web'],
+                            textChannel: message.channel,
                             metadata: { requestedBy: member.id }
                         });
                     } catch (e) {}
@@ -699,9 +716,9 @@ client.on("messageCreate", async message => {
                 return sendElegant(message.channel, "🎶 تشغيل قائمة التشغيل", `جاري الآن إضافة وتجهيز تشغيل القائمة بالكامل: **${name}**`);
             }
 
-            return sendElegant(message.channel, "📋 نظام قوائم التشغيل (Luna)", [
+            return sendElegant(message.channel, "📋 نظام قوائم التشغيل", [
                 "الأوامر المتاحة للإدارة:",
-                "`5list create <name>` - إنشـاء قائمة جديدة",
+                "`5list create <name>` - إنشاء قائمة جديدة",
                 "`5list add <name> <song>` - إضافة أغنية للقائمة",
                 "`5list show` - عرض جميع القوائم المحفوظة",
                 "`5list play <name>` - تشغيل قائمة كاملة دفعة واحدة"
@@ -761,7 +778,7 @@ distube.on("error", async (error, queue) => {
 // ======================================================
 
 client.once("ready", async () => {
-    console.log(`🔴 RED & LUNA MUSIC ONLINE & FAST: ${client.user.tag}`);
+    console.log(`🔴 RED MUSIC ONLINE & FAST: ${client.user.tag}`);
     await registerCommands(client);
 
     client.user.setPresence({
