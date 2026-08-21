@@ -1,4 +1,4 @@
-const {
+U78const {
     Client,
     GatewayIntentBits,
     EmbedBuilder,
@@ -586,7 +586,7 @@ async function playSong({
         throw new Error(
             "❌ لازم تدخل روم صوتي أولاً."
         );
-    }catch 
+    }
 
     const botChannel = getBotVoiceChannel(guild);
 
