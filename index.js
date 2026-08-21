@@ -127,7 +127,12 @@ const distube = new DisTube(client, {
 
     plugins: [
         new SoundCloudPlugin(),
-        new YtDlpPlugin()
+        new YtDlpPlugin({
+            update: false,
+            args: [
+                "--extractor-args", "youtube:player_client=default,android,tv"
+            ]
+        })
     ]
 });
 
@@ -265,6 +270,7 @@ function sendSafe(channel, content) {
 
     return channel.send(content).catch(() => {});
 }
+
  
 // ======================================================
 // CONTROL PANEL
