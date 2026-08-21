@@ -2037,7 +2037,7 @@ distube
         );
     })
 
-    .on("error", async (error, queue) => {
+        .on("error", async (error, queue) => {
         // كتم أخطاء التشغيل التقنية في الشات لمنع الإزعاج نهائياً
         console.error("❌ DisTube error caught silently:", error.message);
     })
@@ -2045,6 +2045,7 @@ distube
     .on("noRelated", queue => {
         // كتم رسائل عدم وجود مقاطع مرتبطة
     });
+
 
 // ======================================================
 // VOICE STATE
