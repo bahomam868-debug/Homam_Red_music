@@ -127,15 +127,13 @@ const distube = new DisTube(client, {
 
     plugins: [
         new SoundCloudPlugin(),
-
-        new YtDlpPlugin({
-            update: true
-        })
+        new YtDlpPlugin()
     ]
 });
 
 console.log("🔴 RED MUSIC");
 console.log("✅ DisTube loaded");
+
 
 // ======================================================
 // RUNTIME STATE
