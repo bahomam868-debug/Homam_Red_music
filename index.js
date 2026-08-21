@@ -2139,6 +2139,15 @@ client.once("ready", async () => {
     console.log("====================================");
     console.log("");
 
+    try {
+        // تنظيف الأوامر القديمة لمنع التكرار قبل تسجيل الجديدة
+        const rest = new REST({ version: '10' }).setToken(TOKEN);
+        await rest.put(Routes.applicationCommands(client.user.id), { body: [] });
+        console.log("🧹 تم تنظيف الأوامر القديمة بنجاح");
+    } catch (error) {
+        console.error("❌ خطأ أثناء تنظيف الأوامر القديمة:", error);
+    }
+
     await registerSlashCommands();
 
     client.user.setPresence({
@@ -2175,3 +2184,4 @@ process.on("uncaughtException", error => {
 // ======================================================
 
 client.login(TOKEN);
+
