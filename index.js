@@ -1906,6 +1906,51 @@ distube
                 await queue.textChannel.send(
                     createControlPanel(
                         queue,
+// ======================================================
+// DISTUBE EVENTS
+// ======================================================
+
+distube
+    .on("initQueue", queue => {
+        queue.setVolume(50);
+    })
+
+    .on("addSong", async (queue, song) => {
+
+        if (!queue.textChannel) {
+            return;
+        }
+
+        await queue.textChannel.send(
+            `➕ **تمت إضافة الأغنية إلى التشغيل**\n\n🎵 **${song.name}**\n⏱️ \`${song.formattedDuration}\``
+        ).catch(() => {});
+    })
+
+    .on("addList", async (queue, playlist) => {
+
+        if (!queue.textChannel) {
+            return;
+        }
+
+        await queue.textChannel.send(
+            `📋 **تم إضافة قائمة التشغيل**\n**${playlist.name}**`
+        ).catch(() => {});
+    })
+
+    .on("playSong", async (queue, song) => {
+
+        clearLeaveTimer(queue.id);
+
+        if (!queue.textChannel) {
+            return;
+        }
+
+        try {
+
+            const panel =
+                await queue.textChannel.send(
+                    createControlPanel(
+                        queue,
                         song
                     )
                 );
@@ -1916,10 +1961,7 @@ distube
             );
 
         } catch (error) {
-            console.error(
-                "❌ Control panel error:",
-                error
-            );
+            // كتم أخطاء لوحة التحكم بصمت
         }
     })
 
@@ -1935,8 +1977,6 @@ distube
         const guildData =
             getGuildData(guild.id);
 
-        // إذا في أغنية بعدها DisTube سيبدأها
-        // وإذا ما في، ننتظر 10 دقائق.
         if (!guildData.mode247) {
             scheduleLeave(guild);
         }
@@ -1984,7 +2024,7 @@ distube
 
                     if (channel?.isTextBased()) {
                         channel.send(
-                            "👋 **RED MUSIC** خرج من الروم الصوتي."
+                            "🔴 **RED MUSIC**\n\n👋 **تم إخراج البوت من الروم الصوتي**"
                         ).catch(() => {});
                     }
 
@@ -1998,27 +2038,12 @@ distube
     })
 
     .on("error", async (error, queue) => {
-
-        console.error(
-            "❌ DisTube error:",
-            error
-        );
-
-        if (queue?.textChannel) {
-
-            await queue.textChannel.send(
-                `❌ **Music Error**\n\`${String(error.message).slice(0, 1800)}\``
-            ).catch(() => {});
-        }
+        // كتم أخطاء التشغيل التقنية في الشات لمنع الإزعاج نهائياً
+        console.error("❌ DisTube error caught silently:", error.message);
     })
 
     .on("noRelated", queue => {
-
-        if (queue?.textChannel) {
-            queue.textChannel.send(
-                "📭 انتهت قائمة التشغيل ولا توجد أغنية أخرى."
-            ).catch(() => {});
-        }
+        // كتم رسائل عدم وجود مقاطع مرتبطة
     });
 
 // ======================================================
