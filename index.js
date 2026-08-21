@@ -2015,7 +2015,7 @@ client.on(
 );
 
 // ======================================================
-// DISTUBE EVENTS (الرسائل المرتبة الأصلية)
+// DISTUBE EVENTS (التصميم الأصلي المرتب)
 // ======================================================
 
 distube.on(
@@ -2028,30 +2028,32 @@ distube.on(
 distube.on(
     "addSong",
     async (queue, song) => {
-        if (!queue.textChannel) return;
-        await queue.textChannel.send(
-            `🎵 **تم إضافة الأغنية للتشغيل**\n**${song.name}**`
-        ).catch(() => {});
+        // تم إلغاء الرسالة النصية العادية هنا لكي لا تتكرر مع لوحة التشغيل وتخرب المنظر
     }
 );
 
 distube.on(
     "playSong",
     async (queue, song) => {
+
         clearLeaveTimer(queue.id);
-        if (!queue.textChannel) return;
+
+        if (!queue.textChannel) {
+            return;
+        }
 
         try {
-            // حذف اللوحة القديمة لمنع التكرار
+            // حذف اللوحة القديمة لمنع التكرار نهائياً
             const oldMessage = controlMessages.get(queue.id);
             if (oldMessage) {
                 await oldMessage.delete().catch(() => {});
             }
 
-            // استخدام دالة بناء اللوحة الأصلية المرتبة
+            // إرسال اللوحة بتصميمها المرتب الأصلي
             const panel = await queue.textChannel.send(
                 createPanel(queue, song)
             );
+
             controlMessages.set(queue.id, panel);
         } catch (error) {}
     }
@@ -2094,22 +2096,17 @@ distube.on(
 
 distube.on(
     "error",
-    async (error, queue) => {
-        if (queue?.textChannel) {
-            await queue.textChannel.send(
-                `❌ **Music Error**\n\`${String(error.message).slice(0, 1800)}\``
-            ).catch(() => {});
-        }
-    }
+    async (error, queue) => {}
 );
 
 // ======================================================
-// VOICE EVENTS (رسائل الدخول والخروج المرتبة كالصور)
+// VOICE EVENTS (رسالة دخول وخروج واحدة ومنسقة)
 // ======================================================
 
 client.on(
     "voiceStateUpdate",
     async (oldState, newState) => {
+
         if (!client.user) return;
         if (
             oldState.id !== client.user.id &&
@@ -2122,7 +2119,7 @@ client.on(
         const oldChannel = oldState.channel;
         const newChannel = newState.channel;
 
-        // BOT JOIN (رسالة الدخول المرتبة مع الأيقونة)
+        // BOT JOIN
         if (!oldChannel && newChannel) {
             const channelId = textChannels.get(guild.id);
             if (channelId) {
@@ -2138,7 +2135,7 @@ client.on(
             }
         }
 
-        // BOT LEAVE (رسالة الخروج المرتبة)
+        // BOT LEAVE
         if (oldChannel && !newChannel) {
             clearLeaveTimer(guild.id);
             const channelId = textChannels.get(guild.id);
@@ -2153,12 +2150,12 @@ client.on(
                     ).catch(() => {});
                 }
             }
+
             controlMessages.delete(guild.id);
             textChannels.delete(guild.id);
         }
     }
-);
-// ======================================================
+);// ======================================================
 // READY
 // ======================================================
 
