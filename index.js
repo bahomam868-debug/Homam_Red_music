@@ -1871,52 +1871,6 @@ distube
     })
 
     .on("addSong", async (queue, song) => {
-
-        if (!queue.textChannel) {
-            return;
-        }
-
-        await queue.textChannel.send(
-            `🎵 **تم إضافة الأغنية للتشغيل**\n**${song.name}**\n👤 ${song.user || "Unknown"}`
-        ).catch(() => {});
-    })
-
-    .on("addList", async (queue, playlist) => {
-
-        if (!queue.textChannel) {
-            return;
-        }
-
-        await queue.textChannel.send(
-            `📋 **تم إضافة قائمة التشغيل**\n**${playlist.name}**`
-        ).catch(() => {});
-    })
-
-    .on("playSong", async (queue, song) => {
-
-        clearLeaveTimer(queue.id);
-
-        if (!queue.textChannel) {
-            return;
-        }
-
-        try {
-
-            const panel =
-                await queue.textChannel.send(
-                    createControlPanel(
-                        queue,
-// ======================================================
-// DISTUBE EVENTS
-// ======================================================
-
-distube
-    .on("initQueue", queue => {
-        queue.setVolume(50);
-    })
-
-    .on("addSong", async (queue, song) => {
-
         if (!queue.textChannel) {
             return;
         }
@@ -1927,7 +1881,6 @@ distube
     })
 
     .on("addList", async (queue, playlist) => {
-
         if (!queue.textChannel) {
             return;
         }
@@ -1938,7 +1891,6 @@ distube
     })
 
     .on("playSong", async (queue, song) => {
-
         clearLeaveTimer(queue.id);
 
         if (!queue.textChannel) {
@@ -1946,36 +1898,24 @@ distube
         }
 
         try {
-
-            const panel =
-                await queue.textChannel.send(
-                    createControlPanel(
-                        queue,
-                        song
-                    )
-                );
-
-            controlMessages.set(
-                queue.id,
-                panel
+            const panel = await queue.textChannel.send(
+                createControlPanel(queue, song)
             );
 
+            controlMessages.set(queue.id, panel);
         } catch (error) {
             // كتم أخطاء لوحة التحكم بصمت
         }
     })
 
     .on("finishSong", async (queue, song) => {
-
-        const guild =
-            client.guilds.cache.get(queue.id);
+        const guild = client.guilds.cache.get(queue.id);
 
         if (!guild) {
             return;
         }
 
-        const guildData =
-            getGuildData(guild.id);
+        const guildData = getGuildData(guild.id);
 
         if (!guildData.mode247) {
             scheduleLeave(guild);
@@ -1983,16 +1923,13 @@ distube
     })
 
     .on("finish", async queue => {
-
-        const guild =
-            client.guilds.cache.get(queue.id);
+        const guild = client.guilds.cache.get(queue.id);
 
         if (!guild) {
             return;
         }
 
-        const guildData =
-            getGuildData(guild.id);
+        const guildData = getGuildData(guild.id);
 
         if (guildData.mode247) {
             return;
@@ -2002,9 +1939,7 @@ distube
     })
 
     .on("disconnect", queue => {
-
-        const guild =
-            client.guilds.cache.get(queue.id);
+        const guild = client.guilds.cache.get(queue.id);
 
         if (!guild) {
             return;
@@ -2012,32 +1947,24 @@ distube
 
         clearLeaveTimer(guild.id);
 
-        const channelId =
-            manualVoiceTextChannels.get(
-                guild.id
-            );
+        const channelId = manualVoiceTextChannels.get(guild.id);
 
         if (channelId) {
-
             guild.channels.fetch(channelId)
                 .then(channel => {
-
                     if (channel?.isTextBased()) {
                         channel.send(
                             "🔴 **RED MUSIC**\n\n👋 **تم إخراج البوت من الروم الصوتي**"
                         ).catch(() => {});
                     }
-
                 })
                 .catch(() => {});
         }
 
-        manualVoiceTextChannels.delete(
-            guild.id
-        );
+        manualVoiceTextChannels.delete(guild.id);
     })
 
-        .on("error", async (error, queue) => {
+    .on("error", async (error, queue) => {
         // كتم أخطاء التشغيل التقنية في الشات لمنع الإزعاج نهائياً
         console.error("❌ DisTube error caught silently:", error.message);
     })
@@ -2046,7 +1973,6 @@ distube
         // كتم رسائل عدم وجود مقاطع مرتبطة
     });
 
-
 // ======================================================
 // VOICE STATE
 // ======================================================
@@ -2054,7 +1980,6 @@ distube
 client.on(
     "voiceStateUpdate",
     async (oldState, newState) => {
-
         if (!client.user) {
             return;
         }
@@ -2066,35 +1991,23 @@ client.on(
             return;
         }
 
-        const guild =
-            newState.guild;
-
-        const oldChannel =
-            oldState.channel;
-
-        const newChannel =
-            newState.channel;
+        const guild = newState.guild;
+        const oldChannel = oldState.channel;
+        const newChannel = newState.channel;
 
         // ----------------------------------------------
         // BOT JOINED
         // ----------------------------------------------
 
         if (!oldChannel && newChannel) {
-
-            const channelId =
-                manualVoiceTextChannels.get(
-                    guild.id
-                );
+            const channelId = manualVoiceTextChannels.get(guild.id);
 
             if (channelId) {
-
-                const channel =
-                    await guild.channels
-                        .fetch(channelId)
-                        .catch(() => null);
+                const channel = await guild.channels
+                    .fetch(channelId)
+                    .catch(() => null);
 
                 if (channel?.isTextBased()) {
-
                     await channel.send(
                         `🔊 **RED MUSIC** دخل إلى الروم الصوتي **${newChannel.name}**`
                     ).catch(() => {});
@@ -2109,34 +2022,23 @@ client.on(
         // ----------------------------------------------
 
         if (oldChannel && !newChannel) {
+            clearLeaveTimer(guild.id);
 
-            clearLeaveTimer(
-                guild.id
-            );
-
-            const channelId =
-                manualVoiceTextChannels.get(
-                    guild.id
-                );
+            const channelId = manualVoiceTextChannels.get(guild.id);
 
             if (channelId) {
-
-                const channel =
-                    await guild.channels
-                        .fetch(channelId)
-                        .catch(() => null);
+                const channel = await guild.channels
+                    .fetch(channelId)
+                    .catch(() => null);
 
                 if (channel?.isTextBased()) {
-
                     await channel.send(
                         "👋 **RED MUSIC** خرج من الروم الصوتي."
                     ).catch(() => {});
                 }
             }
 
-            manualVoiceTextChannels.delete(
-                guild.id
-            );
+            manualVoiceTextChannels.delete(guild.id);
         }
     }
 );
@@ -2146,7 +2048,6 @@ client.on(
 // ======================================================
 
 client.once("ready", async () => {
-
     console.log("");
     console.log("====================================");
     console.log("🔴 RED MUSIC ONLINE");
@@ -2201,4 +2102,5 @@ process.on("uncaughtException", error => {
 // ======================================================
 
 client.login(TOKEN);
+
 
