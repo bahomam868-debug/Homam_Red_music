@@ -2015,7 +2015,7 @@ client.on(
 );
 
 // ======================================================
-// DISTUBE EVENTS
+// DISTUBE EVENTS (الرسائل المرتبة الأصلية)
 // ======================================================
 
 distube.on(
@@ -2028,11 +2028,7 @@ distube.on(
 distube.on(
     "addSong",
     async (queue, song) => {
-
-        if (!queue.textChannel) {
-            return;
-        }
-
+        if (!queue.textChannel) return;
         await queue.textChannel.send(
             `🎵 **تم إضافة الأغنية للتشغيل**\n**${song.name}**`
         ).catch(() => {});
@@ -2042,46 +2038,31 @@ distube.on(
 distube.on(
     "playSong",
     async (queue, song) => {
+        clearLeaveTimer(queue.id);
+        if (!queue.textChannel) return;
 
-        clearLeaveTimer(
-            queue.id
-        );
+        try {
+            // حذف اللوحة القديمة لمنع التكرار
+            const oldMessage = controlMessages.get(queue.id);
+            if (oldMessage) {
+                await oldMessage.delete().catch(() => {});
+            }
 
-        if (!queue.textChannel) {
-            return;
-        }
-
-        const panel =
-            await queue.textChannel.send(
-                createPanel(
-                    queue,
-                    song
-                )
+            // استخدام دالة بناء اللوحة الأصلية المرتبة
+            const panel = await queue.textChannel.send(
+                createPanel(queue, song)
             );
-
-        controlMessages.set(
-            queue.id,
-            panel
-        );
+            controlMessages.set(queue.id, panel);
+        } catch (error) {}
     }
 );
 
 distube.on(
     "finishSong",
     queue => {
-
-        const guild =
-            client.guilds.cache.get(
-                queue.id
-            );
-
-        if (!guild) {
-            return;
-        }
-
-        const guildData =
-            getGuildData(guild.id);
-
+        const guild = client.guilds.cache.get(queue.id);
+        if (!guild) return;
+        const guildData = getGuildData(guild.id);
         if (!guildData.mode247) {
             scheduleLeave(guild);
         }
@@ -2091,19 +2072,9 @@ distube.on(
 distube.on(
     "finish",
     queue => {
-
-        const guild =
-            client.guilds.cache.get(
-                queue.id
-            );
-
-        if (!guild) {
-            return;
-        }
-
-        const guildData =
-            getGuildData(guild.id);
-
+        const guild = client.guilds.cache.get(queue.id);
+        if (!guild) return;
+        const guildData = getGuildData(guild.id);
         if (!guildData.mode247) {
             scheduleLeave(guild);
         }
@@ -2113,55 +2084,18 @@ distube.on(
 distube.on(
     "disconnect",
     queue => {
-
-        const guild =
-            client.guilds.cache.get(
-                queue.id
-            );
-
-        if (!guild) {
-            return;
-        }
-
-        clearLeaveTimer(
-            guild.id
-        );
-
-        const channelId =
-            textChannels.get(
-                guild.id
-            );
-
-        if (channelId) {
-
-            guild.channels
-                .fetch(channelId)
-                .then(channel => {
-
-                    if (channel?.isTextBased()) {
-
-                        channel.send(
-                            "👋 **RED MUSIC** خرج من الروم الصوتي."
-                        ).catch(() => {});
-                    }
-
-                })
-                .catch(() => {});
-        }
+        const guild = client.guilds.cache.get(queue.id);
+        if (!guild) return;
+        clearLeaveTimer(guild.id);
+        controlMessages.delete(guild.id);
+        textChannels.delete(guild.id);
     }
 );
 
 distube.on(
     "error",
     async (error, queue) => {
-
-        console.error(
-            "❌ DisTube Error:",
-            error
-        );
-
         if (queue?.textChannel) {
-
             await queue.textChannel.send(
                 `❌ **Music Error**\n\`${String(error.message).slice(0, 1800)}\``
             ).catch(() => {});
@@ -2170,17 +2104,13 @@ distube.on(
 );
 
 // ======================================================
-// VOICE EVENTS
+// VOICE EVENTS (رسائل الدخول والخروج المرتبة كالصور)
 // ======================================================
 
 client.on(
     "voiceStateUpdate",
     async (oldState, newState) => {
-
-        if (!client.user) {
-            return;
-        }
-
+        if (!client.user) return;
         if (
             oldState.id !== client.user.id &&
             newState.id !== client.user.id
@@ -2188,71 +2118,46 @@ client.on(
             return;
         }
 
-        const guild =
-            newState.guild;
+        const guild = newState.guild;
+        const oldChannel = oldState.channel;
+        const newChannel = newState.channel;
 
-        const oldChannel =
-            oldState.channel;
-
-        const newChannel =
-            newState.channel;
-
-        // BOT JOIN
-
+        // BOT JOIN (رسالة الدخول المرتبة مع الأيقونة)
         if (!oldChannel && newChannel) {
-
-            const channelId =
-                textChannels.get(
-                    guild.id
-                );
-
+            const channelId = textChannels.get(guild.id);
             if (channelId) {
-
-                const channel =
-                    await guild.channels
-                        .fetch(channelId)
-                        .catch(() => null);
+                const channel = await guild.channels
+                    .fetch(channelId)
+                    .catch(() => null);
 
                 if (channel?.isTextBased()) {
-
                     await channel.send(
-                        `🔊 **RED MUSIC** دخل إلى **${newChannel.name}**`
+                        "🔴 **RED MUSIC**\n\n🎵 **تم دخول البوت إلى الروم الصوتي**"
                     ).catch(() => {});
                 }
             }
         }
 
-        // BOT LEAVE
-
+        // BOT LEAVE (رسالة الخروج المرتبة)
         if (oldChannel && !newChannel) {
-
-            clearLeaveTimer(
-                guild.id
-            );
-
-            const channelId =
-                textChannels.get(
-                    guild.id
-                );
-
+            clearLeaveTimer(guild.id);
+            const channelId = textChannels.get(guild.id);
             if (channelId) {
-
-                const channel =
-                    await guild.channels
-                        .fetch(channelId)
-                        .catch(() => null);
+                const channel = await guild.channels
+                    .fetch(channelId)
+                    .catch(() => null);
 
                 if (channel?.isTextBased()) {
-
                     await channel.send(
-                        "👋 **RED MUSIC** خرج من الروم الصوتي."
+                        "🔴 **RED MUSIC**\n\n👋 **تم إخراج البوت من الروم الصوتي**"
                     ).catch(() => {});
                 }
             }
+            controlMessages.delete(guild.id);
+            textChannels.delete(guild.id);
         }
     }
 );
-
 // ======================================================
 // READY
 // ======================================================
@@ -2281,6 +2186,12 @@ client.once(
             "================================"
         );
         console.log("");
+
+        try {
+            const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN || TOKEN);
+            await rest.put(Routes.applicationCommands(client.user.id), { body: [] });
+            console.log("🧹 تم تنظيف الأوامر القديمة المكررة");
+        } catch (e) {}
 
         await registerCommands();
 
@@ -2324,4 +2235,4 @@ process.on(
 // LOGIN
 // ======================================================
 
-client.login(TOKEN);
+client.login(process.env.DISCORD_TOKEN || TOKEN);
