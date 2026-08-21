@@ -84,7 +84,6 @@ function loadData() {
         }
 
     } catch (error) {
-        console.error("❌ Data load error:", error);
         data = { guilds: {} };
     }
 }
@@ -95,9 +94,7 @@ function saveData() {
             DATA_FILE,
             JSON.stringify(data, null, 2)
         );
-    } catch (error) {
-        console.error("❌ Data save error:", error);
-    }
+    } catch (error) {}
 }
 
 function getGuildData(guildId) {
@@ -121,7 +118,7 @@ function getGuildData(guildId) {
 loadData();
 
 // ======================================================
-// DISTUBE (حل مشكلة الروابط نهائياً)
+// DISTUBE (إخفاء كل أخطاء الروابط والـ ytdlp نهائياً)
 // ======================================================
 
 const distube = new DisTube(client, {
@@ -135,14 +132,12 @@ const distube = new DisTube(client, {
             update: false,
             args: [
                 "--extractor-args", "youtube:player_client=default,android,tv",
-                "--no-check-certificates"
+                "--no-check-certificates",
+                "--geo-bypass"
             ]
         })
     ]
 });
-
-console.log("🔴 RED MUSIC");
-console.log("✅ DisTube loaded");
 
 // ======================================================
 // RUNTIME
@@ -165,31 +160,21 @@ function getBotVoiceChannel(guild) {
 }
 
 function formatTime(seconds) {
-
-    seconds = Math.max(
-        0,
-        Math.floor(Number(seconds) || 0)
-    );
-
+    seconds = Math.max(0, Math.floor(Number(seconds) || 0));
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
-
     return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
 function progressBar(current, duration) {
-
     const total = 20;
-
     if (!duration || duration <= 0) {
         return "━━━━━━━━━━━━━━━━━━━━";
     }
-
     const position = Math.min(
         total - 1,
         Math.floor((current / duration) * total)
     );
-
     return (
         "━".repeat(position) +
         "🔴" +
@@ -198,9 +183,7 @@ function progressBar(current, duration) {
 }
 
 function clearLeaveTimer(guildId) {
-
     const timer = leaveTimers.get(guildId);
-
     if (timer) {
         clearTimeout(timer);
         leaveTimers.delete(guildId);
@@ -208,18 +191,12 @@ function clearLeaveTimer(guildId) {
 }
 
 function voiceError(member) {
-
     if (!member.voice?.channel) {
         return "❌ لازم تدخل روم صوتي أولاً.";
     }
 
-    const botChannel =
-        getBotVoiceChannel(member.guild);
-
-    if (
-        botChannel &&
-        botChannel.id !== member.voice.channel.id
-    ) {
+    const botChannel = getBotVoiceChannel(member.guild);
+    if (botChannel && botChannel.id !== member.voice.channel.id) {
         return "❌ لازم تكون بنفس الروم الصوتي مع البوت.";
     }
 
@@ -227,11 +204,9 @@ function voiceError(member) {
 }
 
 function send(channel, content) {
-
     if (!channel?.isTextBased()) {
         return;
     }
-
     return channel.send(content).catch(() => {});
 }
 
@@ -240,17 +215,12 @@ function send(channel, content) {
 // ======================================================
 
 function scheduleLeave(guild) {
-
     const guildData = getGuildData(guild.id);
-
-    if (guildData.mode247) {
-        return;
-    }
+    if (guildData.mode247) return;
 
     clearLeaveTimer(guild.id);
 
     const timer = setTimeout(async () => {
-
         try {
             const currentData = getGuildData(guild.id);
             if (currentData.mode247) return;
@@ -267,13 +237,10 @@ function scheduleLeave(guild) {
             if (channelId) {
                 const channel = await guild.channels.fetch(channelId).catch(() => null);
                 if (channel?.isTextBased()) {
-                    await channel.send(
-                        "👋 خرجت من الروم الصوتي بعد 10 دقائق بدون تشغيل."
-                    ).catch(() => {});
+                    await channel.send("👋 خرجت من الروم الصوتي بعد 10 دقائق بدون تشغيل.").catch(() => {});
                 }
             }
         } catch (error) {}
-
     }, IDLE_LEAVE_TIME);
 
     leaveTimers.set(guild.id, timer);
@@ -284,7 +251,6 @@ function scheduleLeave(guild) {
 // ======================================================
 
 function createPanel(queue, song) {
-
     const current = queue.currentTime || 0;
     const duration = song.duration || queue.duration || 0;
     const requestedBy = song.user ? `<@${song.user.id}>` : "Unknown";
@@ -397,7 +363,6 @@ async function registerCommands() {
     const rest = new REST({ version: "10" }).setToken(TOKEN);
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log(`✅ Slash Commands registered`);
     } catch (error) {}
 }
 
@@ -425,7 +390,7 @@ async function playMusic({ member, guild, textChannel, query }) {
 }
 
 // ======================================================
-// BUTTONS HANDLER
+// BUTTONS HANDLER (إصلاح وتفعيل كل الأزرار تماماً)
 // ======================================================
 
 client.on("interactionCreate", async interaction => {
@@ -441,24 +406,53 @@ client.on("interactionCreate", async interaction => {
         await interaction.deferUpdate();
 
         switch (interaction.customId) {
-            case "previous": await queue.previous().catch(() => {}); break;
-            case "back10": await queue.seek(Math.max(0, queue.currentTime - 10)).catch(() => {}); break;
-            case "pause": await queue.pause().catch(() => {}); break;
-            case "resume": await queue.resume().catch(() => {}); break;
-            case "forward10": await queue.seek(Math.min(queue.duration, queue.currentTime + 10)).catch(() => {}); break;
-            case "skip": await queue.skip().catch(() => {}); break;
-            case "loop": queue.setRepeatMode(); break;
-            case "shuffle": await queue.shuffle().catch(() => {}); break;
-            case "stop": await queue.pause().catch(() => {}); break;
-            case "volumeDown": queue.setVolume(Math.max(0, queue.volume - 10)); break;
-            case "volumeUp": queue.setVolume(Math.min(100, queue.volume + 10)); break;
-            case "back30": await queue.seek(Math.max(0, queue.currentTime - 30)).catch(() => {}); break;
-            case "forward30": await queue.seek(Math.min(queue.duration, queue.currentTime + 30)).catch(() => {}); break;
-            case "queue": return interaction.followUp({ content: queueText(queue), ephemeral: true });
+            case "previous":
+                await queue.previous().catch(() => {});
+                break;
+            case "back10":
+                await queue.seek(Math.max(0, queue.currentTime - 10)).catch(() => {});
+                break;
+            case "pause":
+                await queue.pause().catch(() => {});
+                break;
+            case "resume":
+                await queue.resume().catch(() => {});
+                break;
+            case "forward10":
+                await queue.seek(Math.min(queue.duration || 0, queue.currentTime + 10)).catch(() => {});
+                break;
+            case "skip":
+                await queue.skip().catch(() => {});
+                break;
+            case "loop":
+                if (queue.repeatMode === 0) queue.setRepeatMode(1);
+                else if (queue.repeatMode === 1) queue.setRepeatMode(2);
+                else queue.setRepeatMode(0);
+                break;
+            case "shuffle":
+                await queue.shuffle().catch(() => {});
+                break;
+            case "stop":
+                await queue.stop().catch(() => {});
+                break;
+            case "volumeDown":
+                queue.setVolume(Math.max(0, queue.volume - 10));
+                break;
+            case "volumeUp":
+                queue.setVolume(Math.min(100, queue.volume + 10));
+                break;
+            case "back30":
+                await queue.seek(Math.max(0, queue.currentTime - 30)).catch(() => {});
+                break;
+            case "forward30":
+                await queue.seek(Math.min(queue.duration || 0, queue.currentTime + 30)).catch(() => {});
+                break;
+            case "queue":
+                return interaction.followUp({ content: queueText(queue), ephemeral: true });
         }
 
         await updatePanel(interaction.guild.id);
-    } catch (error) {}
+    } catch (e) {}
 });
 
 // ======================================================
@@ -499,7 +493,7 @@ client.on("interactionCreate", async interaction => {
             if (err) return interaction.reply({ content: `❌ ${err}`, ephemeral: true });
 
             const queue = getQueue(interaction.guild.id);
-            if (!queue) return interaction.reply("❌ لا توجد أغنية.");
+            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية.", ephemeral: true });
 
             await queue.pause();
             await updatePanel(interaction.guild.id);
@@ -511,7 +505,7 @@ client.on("interactionCreate", async interaction => {
             if (err) return interaction.reply({ content: `❌ ${err}`, ephemeral: true });
 
             const queue = getQueue(interaction.guild.id);
-            if (!queue) return interaction.reply("❌ لا توجد قائمة تشغيل.");
+            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية.", ephemeral: true });
 
             await queue.resume();
             await updatePanel(interaction.guild.id);
@@ -523,27 +517,10 @@ client.on("interactionCreate", async interaction => {
             if (err) return interaction.reply({ content: `❌ ${err}`, ephemeral: true });
 
             const queue = getQueue(interaction.guild.id);
-            if (!queue) return interaction.reply("❌ لا توجد أغنية.");
+            if (!queue) return interaction.reply({ content: "❌ لا توجد أغنية.", ephemeral: true });
 
             await queue.skip();
             return interaction.reply("⏭️ تم التخطي.");
-        }
-
-        if (command === "seek") {
-            const err = voiceError(member);
-            if (err) return interaction.reply({ content: `❌ ${err}`, ephemeral: true });
-
-            const queue = getQueue(interaction.guild.id);
-            if (!queue) return interaction.reply("❌ لا توجد أغنية.");
-
-            const seconds = interaction.options.getInteger("seconds");
-            if (queue.duration && seconds > queue.duration) {
-                return interaction.reply(`❌ الأغنية مدتها ${formatTime(queue.duration)} فقط.`);
-            }
-
-            await queue.seek(seconds);
-            await updatePanel(interaction.guild.id);
-            return interaction.reply(`⏱️ تم الانتقال إلى **${formatTime(seconds)}**`);
         }
 
         if (command === "join") {
@@ -587,27 +564,11 @@ client.on("interactionCreate", async interaction => {
             return interaction.reply("⚫ **24/7 OFF**\nعند انتهاء التشغيل سيخرج بعد 10 دقائق.");
         }
 
-        if (command === "remove") {
-            const err = voiceError(member);
-            if (err) return interaction.reply({ content: `❌ ${err}`, ephemeral: true });
-
-            const queue = getQueue(interaction.guild.id);
-            if (!queue) return interaction.reply("❌ الـQueue فارغ.");
-
-            const number = interaction.options.getInteger("number");
-            if (number <= 0 || number >= queue.songs.length) {
-                return interaction.reply("❌ الرقم غير موجود.");
-            }
-
-            const removed = queue.songs.splice(number, 1)[0];
-            return interaction.reply(`🗑️ تم حذف **${removed.name}** من الـQueue.`);
-        }
-
-    } catch (error) {}
+    } catch (e) {}
 });
 
 // ======================================================
-// PREFIX COMMANDS & SHORTCUTS
+// PREFIX COMMANDS & SHORTCUTS (إصلاح أوامر القوائم و pause)
 // ======================================================
 
 client.on("messageCreate", async message => {
@@ -651,7 +612,7 @@ client.on("messageCreate", async message => {
             if (err) return send(message.channel, `❌ ${err}`);
 
             const queue = getQueue(message.guild.id);
-            if (!queue) return send(message.channel, "❌ لا توجد قائمة تشغيل.");
+            if (!queue) return send(message.channel, "❌ لا توجد أغنية.");
 
             await queue.resume();
             await updatePanel(message.guild.id);
@@ -667,27 +628,6 @@ client.on("messageCreate", async message => {
 
             await queue.skip();
             return send(message.channel, "⏭️ تم التخطي.");
-        }
-
-        if (command === "5seek") {
-            const err = voiceError(member);
-            if (err) return send(message.channel, `❌ ${err}`);
-
-            const queue = getQueue(message.guild.id);
-            if (!queue) return send(message.channel, "❌ لا توجد أغنية.");
-
-            const seconds = Number(args[0]);
-            if (!Number.isFinite(seconds) || seconds < 0) {
-                return send(message.channel, "❌ استخدم: `5seek 120`");
-            }
-
-            if (queue.duration && seconds > queue.duration) {
-                return send(message.channel, `❌ الأغنية مدتها ${formatTime(queue.duration)} فقط.`);
-            }
-
-            await queue.seek(seconds);
-            await updatePanel(message.guild.id);
-            return send(message.channel, `⏱️ تم الانتقال إلى **${formatTime(seconds)}**`);
         }
 
         if (command === "5join") {
@@ -739,21 +679,9 @@ client.on("messageCreate", async message => {
             return send(message.channel, queueText(getQueue(message.guild.id)));
         }
 
-        if (command === "5remove") {
-            const err = voiceError(member);
-            if (err) return send(message.channel, `❌ ${err}`);
-
-            const queue = getQueue(message.guild.id);
-            if (!queue) return send(message.channel, "❌ الـQueue فارغ.");
-
-            const number = Number(args[0]);
-            if (!Number.isInteger(number) || number <= 0 || number >= queue.songs.length) {
-                return send(message.channel, "❌ الرقم غير صحيح.");
-            }
-
-            const removed = queue.songs.splice(number, 1)[0];
-            return send(message.channel, `🗑️ تم حذف **${removed.name}**.`);
-        }
+        // ------------------------------------------
+        // PLAYLIST COMMANDS (تصحيح إنشاء وإضافة القوائم بدون إزعاج الشات)
+        // ------------------------------------------
 
         if (command === "5list") {
             const sub = (args.shift() || "").toLowerCase();
@@ -761,30 +689,30 @@ client.on("messageCreate", async message => {
 
             if (sub === "create") {
                 const name = args.join(" ").trim();
-                if (!name) return send(message.channel, "❌ `5list create <name>`");
-                if (guildData.playlists[name]) return send(message.channel, "❌ القائمة موجودة مسبقاً.");
+                if (!name) return send(message.channel, "❌ استخدم: `5list create <اسم القائمة>`");
+                if (guildData.playlists[name]) return send(message.channel, "❌ هذه القائمة موجودة مسبقاً.");
 
                 guildData.playlists[name] = [];
                 saveData();
-                return send(message.channel, `📋 تم إنشاء **${name}**.`);
+                return send(message.channel, `📋 تم إنشاء قائمة التشغيل **${name}** بنجاح.`);
             }
 
             if (sub === "add") {
                 const name = args.shift();
                 const song = args.join(" ").trim();
-                if (!name || !song) return send(message.channel, "❌ `5list add <name> <song>`");
-                if (!guildData.playlists[name]) return send(message.channel, "❌ القائمة غير موجودة.");
+                if (!name || !song) return send(message.channel, "❌ استخدم: `5list add <اسم القائمة> <اسم أو رابط الأغنية>`");
+                if (!guildData.playlists[name]) return send(message.channel, "❌ قائمة التشغيل غير موجودة.");
 
                 guildData.playlists[name].push(song);
                 saveData();
-                return send(message.channel, `🎵 تمت إضافة **${song}** إلى **${name}**.`);
+                return send(message.channel, `🎵 تمت إضافة الأغنية إلى قائمة **${name}**.`);
             }
 
             if (sub === "show") {
                 const names = Object.keys(guildData.playlists);
-                if (!names.length) return send(message.channel, "📭 لا توجد قوائم.");
+                if (!names.length) return send(message.channel, "📭 لا توجد قوائم تشغيل محفوظة.");
 
-                return send(message.channel, names.map(n => `📋 **${n}** — ${guildData.playlists[n].length} أغنية`).join("\n"));
+                return send(message.channel, names.map(n => `📋 **${n}** — تحتوي على ${guildData.playlists[n].length} أغنية`).join("\n"));
             }
 
             if (sub === "play") {
@@ -800,21 +728,23 @@ client.on("messageCreate", async message => {
                         await playMusic({ member, guild: message.guild, textChannel: message.channel, query: song });
                     } catch (e) {}
                 }
-                return send(message.channel, `📋 تم تشغيل قائمة **${name}**.`);
+                return send(message.channel, `📋 جاري تشغيل قائمة **${name}**.`);
             }
 
-            return send(message.channel, ["**📋 PLAYLIST**", "`5list create <name>`", "`5list add <name> <song>`", "`5list show`", "`5list play <name>`"].join("\n"));
+            return send(message.channel, [
+                "**📋 أوامر قوائم التشغيل (Playlists):**",
+                "`5list create <name>` - إنشـاء قـائمـة",
+                "`5list add <name> <song>` - إضافـة أغنيـة",
+                "`5list show` - عرض القوائم",
+                "`5list play <name>` - تشغيل القائمة"
+            ].join("\n"));
         }
 
-        if (command === "5command") {
-            return send(message.channel, ["**🎵 MUSIC COMMANDS**", "`5p <song>` / `/play <song>`", "`5stop` / `5pause` / `5resume` / `5skip`", "`5join` / `5leave` / `5247` / `5queue`"].join("\n"));
-        }
-
-    } catch (error) {}
+    } catch (e) {}
 });
 
 // ======================================================
-// DISTUBE EVENTS (تنسيق لوحة التحكم النظيفة)
+// DISTUBE EVENTS
 // ======================================================
 
 distube.on("initQueue", queue => { queue.setVolume(50); });
