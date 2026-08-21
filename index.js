@@ -1,4 +1,4 @@
-U78const {
+const {
     Client,
     GatewayIntentBits,
     EmbedBuilder,
@@ -17,6 +17,7 @@ const ffmpeg = require("@ffmpeg-installer/ffmpeg");
 
 const fs = require("fs");
 const path = require("path");
+ 
 
 // ======================================================
 // CONFIG
